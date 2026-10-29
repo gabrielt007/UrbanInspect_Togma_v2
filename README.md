@@ -159,17 +159,7 @@ android/              # Proyecto nativo Android de Capacitor
 | **R8** | Guardar y recuperar borradores del formulario en almacenamiento local. |
 | **R9** | Consultar el detalle y actualizar el estado de una incidencia. |
 
-## Capturas
 
-Reemplaza los marcadores por capturas reales de la aplicación antes de publicar:
-
-| Inicio | Incidencias |
-|---|---|
-| ![Captura del dashboard de Inicio](docs/capturas/inicio.png) | ![Captura del listado de incidencias](docs/capturas/incidencias.png) |
-
-| Formulario de registro | Seguimiento |
-|---|---|
-| ![Captura del formulario de registro](docs/capturas/registro.png) | ![Captura de la pestaña Seguimiento](docs/capturas/seguimiento.png) |
 
 ## Autor
 
