@@ -1,0 +1,136 @@
+.loading-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem 1rem;
+
+  p {
+    margin-top: 1rem;
+    color: var(--ion-color-medium);
+  }
+}
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 4rem 2rem;
+  text-align: center;
+
+  .empty-icon {
+    font-size: 4rem;
+    color: var(--ion-color-danger);
+    margin-bottom: 1rem;
+  }
+
+  h3 {
+    font-weight: 600;
+    margin: 0 0 0.5rem;
+  }
+
+  p {
+    color: var(--ion-color-medium);
+    margin: 0;
+  }
+}
+
+.header-card {
+  ion-card-header {
+    padding-bottom: 4px;
+  }
+
+  .codigo {
+    font-family: monospace;
+    font-size: 0.85rem;
+    letter-spacing: 0.5px;
+  }
+
+  ion-card-title {
+    font-size: 1.3rem;
+    font-weight: 700;
+  }
+
+  .estado-badge {
+    font-size: 0.85rem;
+    padding: 4px 10px;
+    border-radius: 8px;
+  }
+
+  .categoria-chip {
+    margin-left: 8px;
+    height: 26px;
+    font-size: 0.8rem;
+  }
+}
+
+.info-list {
+  ion-item {
+    --padding-start: 0;
+    --inner-padding-end: 0;
+
+    p {
+      font-size: 0.75rem;
+      color: var(--ion-color-medium);
+      margin-bottom: 2px;
+    }
+
+    h3 {
+      font-size: 0.95rem;
+      font-weight: 500;
+    }
+  }
+}
+
+.foto-incidencia {
+  width: 100%;
+  max-height: 300px;
+  object-fit: cover;
+  border-radius: 0 0 8px 8px;
+}
+
+.estado-card {
+  ion-card-subtitle {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .btn-cambiar-estado {
+    margin-top: 16px;
+  }
+
+  .btn-spinner {
+    width: 20px;
+    height: 20px;
+  }
+}
+
+.historial-list {
+  ion-item {
+    --padding-start: 0;
+
+    h3 {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .mini-badge {
+      font-size: 0.7rem;
+      padding: 2px 6px;
+    }
+
+    p {
+      margin-top: 4px;
+      font-size: 0.85rem;
+    }
+
+    ion-note {
+      font-size: 0.75rem;
+    }
+  }
+}
+

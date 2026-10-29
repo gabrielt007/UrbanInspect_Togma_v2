@@ -1,0 +1,211 @@
+<ion-header>
+  <ion-toolbar color="primary">
+    <ion-buttons slot="start">
+      <ion-button (click)="cancelar()">
+        <ion-icon slot="icon-only" name="close-outline"></ion-icon>
+      </ion-button>
+    </ion-buttons>
+    <ion-title>Nueva Incidencia</ion-title>
+    <ion-buttons slot="end">
+      <ion-button
+        (click)="guardar()"
+        [disabled]="!formularioValido() || guardando"
+        [strong]="true">
+        @if (guardando) {
+          <ion-spinner name="crescent" class="btn-spinner"></ion-spinner>
+        } @else {
+          Guardar
+        }
+      </ion-button>
+    </ion-buttons>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content class="ion-padding">
+  <!-- Aviso de borrador recuperado -->
+  @if (borradorRecuperado) {
+    <ion-chip color="tertiary" class="borrador-chip">
+      <ion-icon name="save-outline"></ion-icon>
+      <ion-label>Borrador recuperado</ion-label>
+    </ion-chip>
+  }
+
+  <ion-list lines="full">
+    <!-- Título -->
+    <ion-item>
+      <ion-input
+        label="Título *"
+        labelPlacement="stacked"
+        placeholder="Ej: Bache en Av. Amazonas"
+        [(ngModel)]="titulo"
+        (ionBlur)="guardarBorrador()"
+        [maxlength]="100"
+        counter="true"
+        required>
+      </ion-input>
+    </ion-item>
+
+    <!-- Categoría -->
+    <ion-item>
+      <ion-select
+        label="Categoría *"
+        labelPlacement="stacked"
+        [(ngModel)]="categoria"
+        interface="popover">
+        @for (cat of categorias; track cat) {
+          <ion-select-option [value]="cat">
+            {{ cat | titlecase }}
+          </ion-select-option>
+        }
+      </ion-select>
+    </ion-item>
+
+    <!-- Descripción -->
+    <ion-item>
+      <ion-textarea
+        label="Descripción *"
+        labelPlacement="stacked"
+        placeholder="Describe la incidencia con detalle..."
+        [(ngModel)]="descripcion"
+        (ionBlur)="guardarBorrador()"
+        [autoGrow]="true"
+        [rows]="3"
+        [maxlength]="500"
+        counter="true"
+        required>
+      </ion-textarea>
+    </ion-item>
+  </ion-list>
+
+  <!-- R6: Sección de foto -->
+  <div class="section-title">
+    <ion-icon name="camera-outline" aria-hidden="true"></ion-icon>
+    Foto de evidencia
+  </div>
+
+  @if (fotoPreview) {
+    <div class="foto-container">
+      <ion-img [src]="fotoPreview" alt="Vista previa" class="foto-preview"></ion-img>
+      <ion-button fill="clear" color="danger" size="small" (click)="eliminarFoto()">
+        <ion-icon name="close-outline" slot="start"></ion-icon>
+        Eliminar foto
+      </ion-button>
+    </div>
+  } @else {
+    <ion-grid class="foto-actions">
+      <ion-row>
+        <ion-col size="6">
+          <ion-button expand="block" fill="outline" (click)="capturarFoto()">
+            <ion-icon name="camera-outline" slot="start"></ion-icon>
+            Cámara
+          </ion-button>
+        </ion-col>
+        <ion-col size="6">
+          <ion-button expand="block" fill="outline" (click)="seleccionarFoto()">
+            <ion-icon name="image-outline" slot="start"></ion-icon>
+            Galería
+          </ion-button>
+        </ion-col>
+      </ion-row>
+    </ion-grid>
+  }
+
+  <!-- R7: Sección de ubicación -->
+  <div class="section-title">
+    <ion-icon name="location-outline" aria-hidden="true"></ion-icon>
+    Ubicación *
+    @if (categoria === 'bache') {
+      <ion-note color="danger" class="obligatorio-note">(Obligatorio para baches)</ion-note>
+    }
+  </div>
+
+  @if (coordenadas) {
+    <ion-chip color="success" class="coords-chip">
+      <ion-icon name="location-outline"></ion-icon>
+      <ion-label>{{ coordenadas.latitud.toFixed(6) }}, {{ coordenadas.longitud.toFixed(6) }}</ion-label>
+    </ion-chip>
+  }
+
+  <ion-grid>
+    <ion-row>
+      <ion-col size="12">
+        <ion-button
+          expand="block"
+          fill="outline"
+          (click)="obtenerUbicacion()"
+          [disabled]="obteniendoGps">
+          @if (obteniendoGps) {
+            <ion-spinner name="crescent" class="btn-spinner"></ion-spinner>
+          } @else {
+            <ion-icon name="location-outline" slot="start"></ion-icon>
+            Obtener GPS actual
+          }
+        </ion-button>
+      </ion-col>
+    </ion-row>
+  </ion-grid>
+
+  <!-- Modo manual (fallback) -->
+  @if (modoManual) {
+    <ion-note color="warning" class="manual-note">
+      No se pudo obtener el GPS. Ingresa las coordenadas manualmente:
+    </ion-note>
+    <ion-list lines="full">
+      <ion-item>
+        <ion-input
+          label="Latitud"
+          labelPlacement="stacked"
+          type="number"
+          placeholder="Ej: -0.1807"
+          [(ngModel)]="latManual"
+          [step]="0.000001">
+        </ion-input>
+      </ion-item>
+      <ion-item>
+        <ion-input
+          label="Longitud"
+          labelPlacement="stacked"
+          type="number"
+          placeholder="Ej: -78.4678"
+          [(ngModel)]="lonManual"
+          [step]="0.000001">
+        </ion-input>
+      </ion-item>
+    </ion-list>
+    <ion-button expand="block" fill="outline" (click)="aplicarCoordenadasManuales()" class="btn-aplicar">
+      Aplicar coordenadas
+    </ion-button>
+  }
+
+  <!-- R4: Datos de clima -->
+  @if (obteniendoClima) {
+    <div class="clima-loading">
+      <ion-spinner name="dots" class="clima-spinner"></ion-spinner>
+      <span>Consultando clima...</span>
+    </div>
+  }
+
+  @if (clima) {
+    <div class="section-title">
+      <ion-icon name="cloud-outline" aria-hidden="true"></ion-icon>
+      Condiciones climáticas
+    </div>
+    <ion-grid class="clima-grid">
+      <ion-row>
+        <ion-col size="4" class="clima-stat">
+          <strong>{{ clima.temperatura }}°C</strong>
+          <span>Temp.</span>
+        </ion-col>
+        <ion-col size="4" class="clima-stat">
+          <strong>{{ clima.precipitacionMm }} mm</strong>
+          <span>Lluvia</span>
+        </ion-col>
+        <ion-col size="4" class="clima-stat">
+          <strong>{{ clima.descripcion | titlecase }}</strong>
+          <span>Condición</span>
+        </ion-col>
+      </ion-row>
+    </ion-grid>
+  }
+</ion-content>
+

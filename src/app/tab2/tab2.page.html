@@ -1,15 +1,84 @@
 <ion-header [translucent]="true">
+  <ion-toolbar color="primary">
+    <ion-title>Incidencias</ion-title>
+  </ion-toolbar>
   <ion-toolbar>
-    <ion-title> Tab 2 </ion-title>
+    <ion-searchbar
+      placeholder="Buscar por código..."
+      [debounce]="400"
+      (ionInput)="buscar($any($event))"
+      animated="true"
+      showCancelButton="focus"
+      cancelButtonText="Cancelar">
+    </ion-searchbar>
   </ion-toolbar>
 </ion-header>
 
 <ion-content [fullscreen]="true">
-  <ion-header collapse="condense">
-    <ion-toolbar>
-      <ion-title size="large">Tab 2</ion-title>
-    </ion-toolbar>
-  </ion-header>
+  <ion-refresher slot="fixed" (ionRefresh)="refrescar($any($event))">
+    <ion-refresher-content pullingText="Tirar para actualizar" refreshingSpinner="circles">
+    </ion-refresher-content>
+  </ion-refresher>
 
-  <app-explore-container name="Tab 2 page"></app-explore-container>
+  <!-- Spinner de carga inicial -->
+  @if (cargandoInicial) {
+    <div class="loading-container">
+      <ion-spinner name="crescent"></ion-spinner>
+      <p>Cargando incidencias...</p>
+    </div>
+  }
+
+  @if (!cargandoInicial) {
+    <!-- Lista vacía -->
+    @if (incidencias.length === 0) {
+      <div class="empty-state">
+        <ion-icon name="document-text-outline" class="empty-icon"></ion-icon>
+        @if (terminoBusqueda) {
+          <h3>Sin resultados</h3>
+          <p>No se encontraron incidencias con el código "{{ terminoBusqueda }}"</p>
+        } @else {
+          <h3>Sin incidencias</h3>
+          <p>No hay incidencias registradas aún</p>
+        }
+      </div>
+    }
+
+    <!-- Listado de incidencias -->
+    @if (incidencias.length > 0) {
+      <ion-list lines="full">
+        @for (incidencia of incidencias; track incidencia.id) {
+          <ion-item button (click)="verDetalle(incidencia)" detail="true" class="incidencia-item">
+            <ion-icon
+              slot="start"
+              name="alert-circle-outline"
+              [color]="colorEstado(incidencia.estado)"
+              class="item-icon"
+              aria-hidden="true">
+            </ion-icon>
+            <ion-label>
+              <h2 class="item-titulo">{{ incidencia.titulo }}</h2>
+              <h3 class="item-codigo">{{ incidencia.codigo }}</h3>
+              <p class="item-meta">
+                <ion-chip [color]="colorEstado(incidencia.estado)" class="chip-estado">
+                  {{ incidencia.estado === 'en_proceso' ? 'En proceso' : (incidencia.estado | titlecase) }}
+                </ion-chip>
+                <span class="chip-categoria">{{ incidencia.categoria | titlecase }}</span>
+              </p>
+            </ion-label>
+            <ion-note slot="end" class="item-fecha">
+              {{ incidencia.fechaCreacion | date:'dd/MM/yy' }}
+            </ion-note>
+          </ion-item>
+        }
+      </ion-list>
+
+      <!-- R3: Infinite scroll para paginación incremental -->
+      <ion-infinite-scroll
+        [disabled]="!hayMasPaginas"
+        (ionInfinite)="cargarMas($any($event))">
+        <ion-infinite-scroll-content loadingSpinner="bubbles" loadingText="Cargando más...">
+        </ion-infinite-scroll-content>
+      </ion-infinite-scroll>
+    }
+  }
 </ion-content>

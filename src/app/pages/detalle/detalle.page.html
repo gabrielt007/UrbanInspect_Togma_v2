@@ -1,0 +1,230 @@
+<ion-header [translucent]="true">
+  <ion-toolbar color="primary">
+    <ion-buttons slot="start">
+      <ion-back-button defaultHref="/tabs/tab2" text="Volver"></ion-back-button>
+    </ion-buttons>
+    <ion-title>Detalle</ion-title>
+    @if (incidencia) {
+      <ion-buttons slot="end">
+        <ion-button (click)="toggleSeguimiento()">
+          <ion-icon
+            slot="icon-only"
+            [name]="estaSeguida ? 'bookmark' : 'bookmark-outline'"
+            [color]="estaSeguida ? 'warning' : ''">
+          </ion-icon>
+        </ion-button>
+      </ion-buttons>
+    }
+  </ion-toolbar>
+</ion-header>
+
+<ion-content [fullscreen]="true" class="ion-padding">
+  <!-- Cargando -->
+  @if (cargando) {
+    <div class="loading-container">
+      <ion-spinner name="crescent"></ion-spinner>
+      <p>Cargando detalle...</p>
+    </div>
+  }
+
+  @if (!cargando && incidencia) {
+    <!-- Encabezado -->
+    <ion-card class="header-card">
+      <ion-card-header>
+        <ion-card-subtitle>
+          <span class="codigo">{{ incidencia.codigo }}</span>
+        </ion-card-subtitle>
+        <ion-card-title>{{ incidencia.titulo }}</ion-card-title>
+      </ion-card-header>
+      <ion-card-content>
+        <ion-badge [color]="colorEstado(incidencia.estado)" class="estado-badge">
+          {{ incidencia.estado === 'en_proceso' ? 'En Proceso' : (incidencia.estado | titlecase) }}
+        </ion-badge>
+        <ion-chip color="medium" class="categoria-chip">
+          {{ incidencia.categoria | titlecase }}
+        </ion-chip>
+      </ion-card-content>
+    </ion-card>
+
+    <!-- Descripción -->
+    <ion-card>
+      <ion-card-header>
+        <ion-card-subtitle>Descripción</ion-card-subtitle>
+      </ion-card-header>
+      <ion-card-content>
+        {{ incidencia.descripcion }}
+      </ion-card-content>
+    </ion-card>
+
+    <!-- Foto -->
+    @if (incidencia.foto) {
+      <ion-card>
+        <ion-card-header>
+          <ion-card-subtitle>
+            <ion-icon name="camera-outline" aria-hidden="true"></ion-icon>
+            Foto
+          </ion-card-subtitle>
+        </ion-card-header>
+        <ion-img [src]="incidencia.foto" alt="Foto de la incidencia" class="foto-incidencia"></ion-img>
+      </ion-card>
+    }
+
+    <!-- Información adicional -->
+    <ion-card>
+      <ion-card-header>
+        <ion-card-subtitle>Información</ion-card-subtitle>
+      </ion-card-header>
+      <ion-card-content>
+        <ion-list lines="none" class="info-list">
+          <!-- Coordenadas -->
+          @if (incidencia.coordenadas) {
+            <ion-item>
+              <ion-icon slot="start" name="location-outline" color="danger" aria-hidden="true"></ion-icon>
+              <ion-label>
+                <p>Ubicación</p>
+                <h3>{{ incidencia.coordenadas.latitud }}, {{ incidencia.coordenadas.longitud }}</h3>
+              </ion-label>
+            </ion-item>
+          }
+
+          <!-- Clima -->
+          @if (incidencia.clima) {
+            <ion-item>
+              <ion-icon slot="start" name="thermometer-outline" color="tertiary" aria-hidden="true"></ion-icon>
+              <ion-label>
+                <p>Temperatura</p>
+                <h3>{{ incidencia.clima.temperatura }}°C</h3>
+              </ion-label>
+            </ion-item>
+            <ion-item>
+              <ion-icon slot="start" name="rainy-outline" color="primary" aria-hidden="true"></ion-icon>
+              <ion-label>
+                <p>Precipitación (última hora)</p>
+                <h3>{{ incidencia.clima.precipitacionMm }} mm</h3>
+              </ion-label>
+            </ion-item>
+            <ion-item>
+              <ion-icon slot="start" name="cloud-outline" color="medium" aria-hidden="true"></ion-icon>
+              <ion-label>
+                <p>Condición</p>
+                <h3>{{ incidencia.clima.descripcion | titlecase }}</h3>
+              </ion-label>
+            </ion-item>
+          }
+
+          <!-- Fechas -->
+          <ion-item>
+            <ion-icon slot="start" name="calendar-outline" color="secondary" aria-hidden="true"></ion-icon>
+            <ion-label>
+              <p>Fecha de creación</p>
+              <h3>{{ incidencia.fechaCreacion | date:'dd/MM/yyyy HH:mm' }}</h3>
+            </ion-label>
+          </ion-item>
+          @if (incidencia.fechaActualizacion) {
+            <ion-item>
+              <ion-icon slot="start" name="time-outline" color="secondary" aria-hidden="true"></ion-icon>
+              <ion-label>
+                <p>Última actualización</p>
+                <h3>{{ incidencia.fechaActualizacion | date:'dd/MM/yyyy HH:mm' }}</h3>
+              </ion-label>
+            </ion-item>
+          }
+        </ion-list>
+      </ion-card-content>
+    </ion-card>
+
+    <!-- R9: Cambio de estado -->
+    <ion-card class="estado-card">
+      <ion-card-header>
+        <ion-card-subtitle>
+          <ion-icon name="swap-horizontal-outline" aria-hidden="true"></ion-icon>
+          Cambiar Estado
+        </ion-card-subtitle>
+      </ion-card-header>
+      <ion-card-content>
+        <ion-list lines="none">
+          <ion-item>
+            <ion-select
+              label="Nuevo estado"
+              labelPlacement="stacked"
+              [(ngModel)]="nuevoEstado"
+              interface="popover">
+              <ion-select-option value="pendiente">Pendiente</ion-select-option>
+              <ion-select-option value="en_proceso">En Proceso</ion-select-option>
+              <ion-select-option value="resuelta">Resuelta</ion-select-option>
+            </ion-select>
+          </ion-item>
+          <ion-item>
+            <ion-textarea
+              label="Observación *"
+              labelPlacement="stacked"
+              placeholder="Describe el motivo del cambio de estado..."
+              [(ngModel)]="observacion"
+              [autoGrow]="true"
+              [rows]="3"
+              [maxlength]="500"
+              counter="true">
+            </ion-textarea>
+          </ion-item>
+        </ion-list>
+
+        <ion-button
+          expand="block"
+          [disabled]="!formularioValido() || actualizando"
+          (click)="cambiarEstado()"
+          class="btn-cambiar-estado">
+          @if (actualizando) {
+            <ion-spinner name="crescent" class="btn-spinner"></ion-spinner>
+          } @else {
+            <ion-icon name="checkmark-circle-outline" slot="start"></ion-icon>
+            Actualizar Estado
+          }
+        </ion-button>
+      </ion-card-content>
+    </ion-card>
+
+    <!-- Historial de cambios -->
+    @if (incidencia.cambiosEstado && incidencia.cambiosEstado.length > 0) {
+      <ion-card>
+        <ion-card-header>
+          <ion-card-subtitle>
+            <ion-icon name="time-outline" aria-hidden="true"></ion-icon>
+            Historial de Cambios
+          </ion-card-subtitle>
+        </ion-card-header>
+        <ion-card-content>
+          <ion-list lines="full" class="historial-list">
+            @for (cambio of incidencia.cambiosEstado; track cambio.fecha) {
+              <ion-item>
+                <ion-icon slot="start" name="swap-horizontal-outline" color="tertiary" aria-hidden="true"></ion-icon>
+                <ion-label class="ion-text-wrap">
+                  <h3>
+                    <ion-badge [color]="colorEstado(cambio.estadoAnterior)" class="mini-badge">
+                      {{ cambio.estadoAnterior }}
+                    </ion-badge>
+                    →
+                    <ion-badge [color]="colorEstado(cambio.estadoNuevo)" class="mini-badge">
+                      {{ cambio.estadoNuevo }}
+                    </ion-badge>
+                  </h3>
+                  <p>{{ cambio.observacion }}</p>
+                  <ion-note>{{ cambio.fecha | date:'dd/MM/yyyy HH:mm' }}</ion-note>
+                </ion-label>
+              </ion-item>
+            }
+          </ion-list>
+        </ion-card-content>
+      </ion-card>
+    }
+  }
+
+  <!-- Error: no se encontró la incidencia -->
+  @if (!cargando && !incidencia) {
+    <div class="empty-state">
+      <ion-icon name="alert-circle-outline" class="empty-icon"></ion-icon>
+      <h3>Incidencia no encontrada</h3>
+      <p>No se pudo cargar la información de esta incidencia.</p>
+    </div>
+  }
+</ion-content>
+

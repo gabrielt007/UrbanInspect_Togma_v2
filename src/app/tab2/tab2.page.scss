@@ -1,0 +1,84 @@
+.loading-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem 1rem;
+
+  p {
+    margin-top: 1rem;
+    color: var(--ion-color-medium);
+  }
+}
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 4rem 2rem;
+  text-align: center;
+
+  .empty-icon {
+    font-size: 4rem;
+    color: var(--ion-color-medium);
+    margin-bottom: 1rem;
+  }
+
+  h3 {
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: var(--ion-color-dark);
+    margin: 0 0 0.5rem;
+  }
+
+  p {
+    color: var(--ion-color-medium);
+    margin: 0;
+  }
+}
+
+.incidencia-item {
+  --padding-start: 12px;
+
+  .item-icon {
+    font-size: 1.6rem;
+  }
+
+  .item-titulo {
+    font-weight: 600;
+    font-size: 0.95rem;
+  }
+
+  .item-codigo {
+    font-size: 0.8rem;
+    color: var(--ion-color-medium);
+    font-family: monospace;
+  }
+
+  .item-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 4px;
+  }
+
+  .chip-estado {
+    height: 22px;
+    font-size: 0.7rem;
+    --padding-start: 6px;
+    --padding-end: 6px;
+  }
+
+  .chip-categoria {
+    font-size: 0.75rem;
+    color: var(--ion-color-medium-shade);
+  }
+
+  .item-fecha {
+    font-size: 0.75rem;
+    align-self: flex-start;
+    margin-top: 12px;
+  }
+}
+

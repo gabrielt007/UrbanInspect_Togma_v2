@@ -2,6 +2,14 @@ import type { Routes } from '@angular/router';
 
 import { TabsPage } from './tabs.page';
 
+/**
+ * Rutas de la estructura de tabs.
+ *
+ * - tab1: Dashboard / Inicio
+ * - tab2: Listado de incidencias
+ *   - tab2/detalle/:id → Vista de detalle (R9)
+ * - tab3: Seguimiento local (R1)
+ */
 export const routes: Routes = [
   {
     path: 'tabs',
@@ -14,6 +22,11 @@ export const routes: Routes = [
       {
         path: 'tab2',
         loadComponent: () => import('../tab2/tab2.page').then((m) => m.Tab2Page),
+      },
+      {
+        path: 'tab2/detalle/:id',
+        loadComponent: () =>
+          import('../pages/detalle/detalle.page').then((m) => m.DetallePage),
       },
       {
         path: 'tab3',

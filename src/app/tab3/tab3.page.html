@@ -1,15 +1,79 @@
 <ion-header [translucent]="true">
-  <ion-toolbar>
-    <ion-title> Tab 3 </ion-title>
+  <ion-toolbar color="primary">
+    <ion-title>
+      <ion-icon name="bookmark-outline" aria-hidden="true"></ion-icon>
+      Seguimiento
+    </ion-title>
   </ion-toolbar>
 </ion-header>
 
 <ion-content [fullscreen]="true">
+  <ion-refresher slot="fixed" (ionRefresh)="refrescar($any($event))">
+    <ion-refresher-content pullingText="Tirar para actualizar" refreshingSpinner="circles">
+    </ion-refresher-content>
+  </ion-refresher>
+
   <ion-header collapse="condense">
     <ion-toolbar>
-      <ion-title size="large">Tab 3</ion-title>
+      <ion-title size="large">Seguimiento Local</ion-title>
     </ion-toolbar>
   </ion-header>
 
-  <app-explore-container name="Tab 3 page"></app-explore-container>
+  <!-- Spinner de carga -->
+  @if (cargando) {
+    <div class="loading-container">
+      <ion-spinner name="crescent"></ion-spinner>
+      <p>Cargando incidencias seguidas...</p>
+    </div>
+  }
+
+  @if (!cargando) {
+    <!-- Estado vacío -->
+    @if (incidenciasSeguidas.length === 0) {
+      <div class="empty-state">
+        <ion-icon name="bookmark-outline" class="empty-icon"></ion-icon>
+        <h3>Sin seguimientos</h3>
+        <p>Aún no has marcado ninguna incidencia para seguimiento local.
+           Puedes hacerlo desde el detalle de cualquier incidencia.</p>
+      </div>
+    }
+
+    <!-- Listado de incidencias seguidas -->
+    @if (incidenciasSeguidas.length > 0) {
+      <div class="seguimiento-header">
+        <p>{{ incidenciasSeguidas.length }} incidencia{{ incidenciasSeguidas.length !== 1 ? 's' : '' }} en seguimiento</p>
+      </div>
+
+      <ion-list lines="full">
+        @for (incidencia of incidenciasSeguidas; track incidencia.id) {
+          <ion-item-sliding>
+            <ion-item button (click)="verDetalle(incidencia)" detail="true">
+              <ion-icon
+                slot="start"
+                name="alert-circle-outline"
+                [color]="colorEstado(incidencia.estado)"
+                class="item-icon"
+                aria-hidden="true">
+              </ion-icon>
+              <ion-label>
+                <h2>{{ incidencia.titulo }}</h2>
+                <h3 class="codigo">{{ incidencia.codigo }}</h3>
+                <p>{{ incidencia.categoria | titlecase }}</p>
+              </ion-label>
+              <ion-badge slot="end" [color]="colorEstado(incidencia.estado)">
+                {{ incidencia.estado === 'en_proceso' ? 'En proceso' : (incidencia.estado | titlecase) }}
+              </ion-badge>
+            </ion-item>
+
+            <!-- Slide para dejar de seguir -->
+            <ion-item-options side="end">
+              <ion-item-option color="danger" (click)="dejarDeSeguir(incidencia)">
+                <ion-icon slot="icon-only" name="trash-outline"></ion-icon>
+              </ion-item-option>
+            </ion-item-options>
+          </ion-item-sliding>
+        }
+      </ion-list>
+    }
+  }
 </ion-content>
