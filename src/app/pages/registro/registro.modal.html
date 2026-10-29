@@ -112,9 +112,9 @@
     Fotografía de Inspección
   </div>
 
-  @if (fotoPreview) {
+  @if (fotografia) {
     <div class="foto-container">
-      <ion-img [src]="fotoPreview" alt="Evidencia capturada" class="foto-preview"></ion-img>
+      <ion-img [src]="fotografia" alt="Evidencia capturada" class="foto-preview"></ion-img>
       <ion-button fill="clear" color="danger" size="small" (click)="eliminarFoto()">
         <ion-icon name="close-outline" slot="start"></ion-icon>
         Eliminar foto

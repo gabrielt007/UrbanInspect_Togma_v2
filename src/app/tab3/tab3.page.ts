@@ -1,29 +1,38 @@
-import { Component, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import type { OnDestroy, OnInit } from '@angular/core';
+import { Component, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import {
-  IonHeader, IonToolbar, IonTitle, IonContent,
-  IonList, IonItem, IonLabel, IonBadge, IonIcon,
-  IonSpinner, IonItemSliding, IonItemOptions, IonItemOption,
-  IonRefresher, IonRefresherContent,
+  IonHeader,
+  IonToolbar,
+  IonTitle,
+  IonContent,
+  IonList,
+  IonItem,
+  IonLabel,
+  IonBadge,
+  IonIcon,
+  IonSpinner,
+  IonItemSliding,
+  IonItemOptions,
+  IonItemOption,
+  IonRefresher,
+  IonRefresherContent,
 } from '@ionic/angular';
 import { addIcons } from 'ionicons';
-import {
-  bookmarkOutline, trashOutline, alertCircleOutline,
-  searchOutline,
-} from 'ionicons/icons';
+import { bookmarkOutline, trashOutline, alertCircleOutline, searchOutline } from 'ionicons/icons';
+import { firstValueFrom, forkJoin, merge } from 'rxjs';
+import type { Subscription } from 'rxjs';
 
+import type { Incidencia } from '../models/incidencia.model';
 import { IncidenciasService } from '../services/incidencias.service';
 import { StorageService } from '../services/storage.service';
-import { Incidencia } from '../models/incidencia.model';
 
 /**
  * Tab 3 – Seguimiento Local
  *
- * Implementa:
- *  - R1: Muestra exclusivamente las incidencias marcadas/seguidas
- *        localmente por el usuario via StorageService.
- *  - Permite eliminar del seguimiento con slide-to-delete.
+ * Muestra exclusivamente las incidencias marcadas/seguidas localmente.
+ * Recupera códigos desde Preferences y sincroniza los cambios de incidencias.
  */
 @Component({
   selector: 'app-tab3',
@@ -31,13 +40,24 @@ import { Incidencia } from '../models/incidencia.model';
   styleUrls: ['tab3.page.scss'],
   imports: [
     CommonModule,
-    IonHeader, IonToolbar, IonTitle, IonContent,
-    IonList, IonItem, IonLabel, IonBadge, IonIcon,
-    IonSpinner, IonItemSliding, IonItemOptions, IonItemOption,
-    IonRefresher, IonRefresherContent,
+    IonHeader,
+    IonToolbar,
+    IonTitle,
+    IonContent,
+    IonList,
+    IonItem,
+    IonLabel,
+    IonBadge,
+    IonIcon,
+    IonSpinner,
+    IonItemSliding,
+    IonItemOptions,
+    IonItemOption,
+    IonRefresher,
+    IonRefresherContent,
   ],
 })
-export class Tab3Page {
+export class Tab3Page implements OnInit, OnDestroy {
   private readonly storageService = inject(StorageService);
   private readonly incidenciasService = inject(IncidenciasService);
   private readonly router = inject(Router);
@@ -45,71 +65,75 @@ export class Tab3Page {
   /** Incidencias seguidas con datos completos */
   incidenciasSeguidas: Incidencia[] = [];
 
-  /** Estado de carga */
+  /** Estado de carga protegido */
   cargando = true;
+
+  private suscripcionCambios?: Subscription;
+  private secuenciaCarga = 0;
 
   constructor() {
     addIcons({ bookmarkOutline, trashOutline, alertCircleOutline, searchOutline });
   }
 
-  /**
-   * Hook del ciclo de vida de Ionic: se ejecuta cada vez que la vista
-   * entra en pantalla para mantener actualizada la lista local.
-   */
+  ngOnInit(): void {
+    this.suscripcionCambios = merge(
+      this.incidenciasService.incidenciaCreada$,
+      this.incidenciasService.incidenciaActualizada$,
+    ).subscribe(() => this.cargarIncidenciasSeguidas());
+  }
+
+  ngOnDestroy(): void {
+    this.suscripcionCambios?.unsubscribe();
+  }
+
   ionViewWillEnter(): void {
     this.cargarIncidenciasSeguidas();
   }
 
   /**
-   * Carga los códigos seguidos y resuelve cada uno contra el API.
+   * Carga los códigos seguidos y los resuelve contra el API.
+   * Apaga obligatoriamente `cargando = false` para evitar bloqueos visuales.
    */
   async cargarIncidenciasSeguidas(): Promise<void> {
+    const secuenciaCarga = ++this.secuenciaCarga;
     this.cargando = true;
 
     try {
-      const codigos = await this.storageService.obtenerCodigosSeguidos();
+      const codigos = [
+        ...new Set((await this.storageService.obtenerCodigosSeguidos()).map((codigo) => codigo.trim()).filter(Boolean)),
+      ];
 
       if (codigos.length === 0) {
-        this.incidenciasSeguidas = [];
-        this.cargando = false;
+        if (secuenciaCarga === this.secuenciaCarga) {
+          this.incidenciasSeguidas = [];
+        }
         return;
       }
 
-      const resultados: Incidencia[] = [];
-      let completados = 0;
-
-      for (const codigo of codigos) {
-        this.incidenciasService.buscarPorCodigo(codigo).subscribe({
-          next: (encontradas) => {
-            if (encontradas.length > 0) {
-              resultados.push(encontradas[0]);
-            }
-            completados++;
-            if (completados === codigos.length) {
-              this.incidenciasSeguidas = resultados;
-              this.cargando = false;
-            }
-          },
-          error: () => {
-            completados++;
-            if (completados === codigos.length) {
-              this.incidenciasSeguidas = resultados;
-              this.cargando = false;
-            }
-          },
-        });
+      const peticiones = codigos.map((codigo) => this.incidenciasService.buscarPorCodigo(codigo));
+      const grupos = await firstValueFrom(forkJoin(peticiones));
+      if (secuenciaCarga === this.secuenciaCarga) {
+        this.incidenciasSeguidas = grupos
+          .map((grupo, index) => grupo.find((incidencia) => incidencia.codigo === codigos[index]))
+          .filter((incidencia): incidencia is Incidencia => incidencia !== undefined);
       }
-    } catch {
-      this.incidenciasSeguidas = [];
-      this.cargando = false;
+    } catch (error) {
+      console.error('Error al cargar las incidencias seguidas:', error);
+      if (secuenciaCarga === this.secuenciaCarga) {
+        this.incidenciasSeguidas = [];
+      }
+    } finally {
+      if (secuenciaCarga === this.secuenciaCarga) {
+        this.cargando = false;
+      }
     }
   }
 
   async dejarDeSeguir(incidencia: Incidencia): Promise<void> {
     await this.storageService.eliminarCodigoSeguido(incidencia.codigo);
-    this.incidenciasSeguidas = this.incidenciasSeguidas.filter(
-      (i) => i.codigo !== incidencia.codigo,
-    );
+    this.secuenciaCarga += 1;
+    this.incidenciasSeguidas = this.incidenciasSeguidas.filter((i) => i.codigo !== incidencia.codigo);
+    this.cargando = false;
   }
 
   verDetalle(incidencia: Incidencia): void {

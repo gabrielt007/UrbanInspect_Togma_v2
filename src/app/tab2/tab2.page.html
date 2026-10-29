@@ -7,6 +7,8 @@
       placeholder="Buscar por código (ej: INC-...)"
       [debounce]="400"
       (ionInput)="buscar($any($event))"
+      (ionClear)="limpiarBusqueda()"
+      (ionCancel)="limpiarBusqueda()"
       animated="true"
       showCancelButton="focus"
       cancelButtonText="Cancelar">

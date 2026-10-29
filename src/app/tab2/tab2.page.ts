@@ -1,7 +1,7 @@
 import { Component, inject, OnInit, OnDestroy, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
-import { Subscription } from 'rxjs';
+import { Subscription, finalize } from 'rxjs';
 import {
   IonHeader, IonToolbar, IonTitle, IonContent,
   IonList, IonItem, IonLabel, IonIcon,
@@ -23,7 +23,8 @@ import { Incidencia } from '../models/incidencia.model';
  *
  * Implementa:
  *  - R3: Carga progresiva / paginación incremental mediante infinite scroll.
- *  - R2, R5: Sincronización automática de nuevos registros creados desde el formulario.
+ *  - R2, R5: Sincronización automática inmediata al registrar una nueva incidencia.
+ *  - Blindado total contra estados de carga infinita (finalize / catchError).
  *  - Navegación al detalle al tocar un elemento (→ R9).
  *  - Búsqueda por código.
  */
@@ -54,14 +55,15 @@ export class Tab2Page implements OnInit, OnDestroy {
   readonly ITEMS_POR_PAGINA = 10;
   hayMasPaginas = true;
 
-  /** Estado de carga */
+  /** Estado de carga protegido */
   cargandoInicial = true;
 
   /** Búsqueda */
   terminoBusqueda = '';
 
-  /** Suscripción a creación reactiva de incidencias */
+  /** Suscripciones reactivas */
   private subscripcionCreacion?: Subscription;
+  private subscripcionActualizacion?: Subscription;
 
   constructor() {
     addIcons({
@@ -74,18 +76,41 @@ export class Tab2Page implements OnInit, OnDestroy {
     this.cargarIncidencias();
 
     // Sincronización automática: al guardar con éxito en MockAPI, el nuevo registro
-    // aparece reflejado inmediatamente al inicio de la lista local.
+    // aparece reflejado de inmediato al inicio del listado general sin duplicados.
     this.subscripcionCreacion = this.incidenciasService.incidenciaCreada$.subscribe((nueva) => {
       this.terminoBusqueda = '';
-      this.incidencias = [
-        nueva,
-        ...this.incidencias.filter((item) => item.codigo !== nueva.codigo && item.id !== nueva.id),
-      ];
+      this.cargandoInicial = false;
+      const sinNueva = this.incidencias.filter(
+        (item) =>
+          (!item.id || item.id !== nueva.id) &&
+          (!item.codigo || item.codigo !== nueva.codigo),
+      );
+      this.incidencias = [nueva, ...sinNueva];
     });
+
+    // Sincronización automática: al actualizar el estado de una incidencia en Detalle,
+    // se refleja de inmediato en el elemento correspondiente del listado general.
+    this.subscripcionActualizacion = this.incidenciasService.incidenciaActualizada$.subscribe(
+      (actualizada) => {
+        const index = this.incidencias.findIndex(
+          (item) =>
+            (item.id && item.id === actualizada.id) ||
+            (item.codigo && item.codigo === actualizada.codigo),
+        );
+        if (index !== -1) {
+          this.incidencias[index] = {
+            ...this.incidencias[index],
+            ...actualizada,
+          };
+          this.incidencias = [...this.incidencias];
+        }
+      },
+    );
   }
 
   ngOnDestroy(): void {
     this.subscripcionCreacion?.unsubscribe();
+    this.subscripcionActualizacion?.unsubscribe();
   }
 
   /**
@@ -98,23 +123,63 @@ export class Tab2Page implements OnInit, OnDestroy {
   }
 
   /**
-   * Carga la primera página de incidencias desde MockAPI.
+   * Une listas de incidencias garantizando unicidad absoluta por ID y Código
+   * para prevenir duplicaciones en la UI y errores de trackBy.
+   */
+  private combinarSinDuplicados(
+    actuales: Incidencia[],
+    nuevas: Incidencia[],
+  ): Incidencia[] {
+    const mapa = new Map<string, Incidencia>();
+
+    for (const item of actuales) {
+      const clave = item.id || item.codigo;
+      if (clave) {
+        mapa.set(clave, item);
+      }
+    }
+
+    for (const item of nuevas) {
+      const clave = item.id || item.codigo;
+      if (clave) {
+        if (mapa.has(clave)) {
+          mapa.set(clave, { ...mapa.get(clave)!, ...item });
+        } else {
+          mapa.set(clave, item);
+        }
+      }
+    }
+
+    return Array.from(mapa.values());
+  }
+
+  /**
+   * Carga la primera página de incidencias. Apaga obligatoriamente
+   * `cargandoInicial = false` para evitar bloqueos visuales.
    */
   cargarIncidencias(): void {
     this.cargandoInicial = true;
     this.paginaActual = 1;
-    this.incidencias = [];
     this.hayMasPaginas = true;
 
     this.incidenciasService
       .obtenerIncidencias(this.paginaActual, this.ITEMS_POR_PAGINA)
+      .pipe(
+        finalize(() => {
+          this.cargandoInicial = false;
+        }),
+      )
       .subscribe({
         next: (data) => {
-          this.incidencias = data;
-          this.hayMasPaginas = data.length === this.ITEMS_POR_PAGINA;
-          this.cargandoInicial = false;
+          const lista = data || [];
+          this.incidencias = this.combinarSinDuplicados([], lista);
+          this.hayMasPaginas = lista.length >= this.ITEMS_POR_PAGINA;
+          if (this.infiniteScroll) {
+            this.infiniteScroll.disabled = !this.hayMasPaginas;
+          }
         },
         error: () => {
+          this.incidencias = [];
           this.cargandoInicial = false;
         },
       });
@@ -124,17 +189,40 @@ export class Tab2Page implements OnInit, OnDestroy {
    * R3: Carga la siguiente página al hacer scroll (paginación incremental).
    */
   cargarMas(event: CustomEvent): void {
+    if (!this.hayMasPaginas) {
+      (event.target as HTMLIonInfiniteScrollElement).complete();
+      (event.target as HTMLIonInfiniteScrollElement).disabled = true;
+      return;
+    }
+
     this.paginaActual++;
 
     this.incidenciasService
       .obtenerIncidencias(this.paginaActual, this.ITEMS_POR_PAGINA)
+      .pipe(
+        finalize(() => {
+          (event.target as HTMLIonInfiniteScrollElement).complete();
+        }),
+      )
       .subscribe({
         next: (data) => {
-          this.incidencias = [...this.incidencias, ...data];
-          this.hayMasPaginas = data.length === this.ITEMS_POR_PAGINA;
-          (event.target as HTMLIonInfiniteScrollElement).complete();
+          const nuevas = data || [];
+          if (nuevas.length === 0) {
+            this.hayMasPaginas = false;
+            (event.target as HTMLIonInfiniteScrollElement).disabled = true;
+            return;
+          }
 
-          if (!this.hayMasPaginas) {
+          const longitudAntes = this.incidencias.length;
+          this.incidencias = this.combinarSinDuplicados(this.incidencias, nuevas);
+          const longitudDespues = this.incidencias.length;
+
+          // Si no se agregaron elementos nuevos únicos o el lote fue menor al límite
+          if (
+            longitudDespues === longitudAntes ||
+            nuevas.length < this.ITEMS_POR_PAGINA
+          ) {
+            this.hayMasPaginas = false;
             (event.target as HTMLIonInfiniteScrollElement).disabled = true;
           }
         },
@@ -154,14 +242,19 @@ export class Tab2Page implements OnInit, OnDestroy {
 
     this.incidenciasService
       .obtenerIncidencias(1, this.ITEMS_POR_PAGINA)
+      .pipe(
+        finalize(() => {
+          (event.target as HTMLIonRefresherElement).complete();
+        }),
+      )
       .subscribe({
         next: (data) => {
-          this.incidencias = data;
-          this.hayMasPaginas = data.length === this.ITEMS_POR_PAGINA;
-          (event.target as HTMLIonRefresherElement).complete();
+          const lista = data || [];
+          this.incidencias = this.combinarSinDuplicados([], lista);
+          this.hayMasPaginas = lista.length >= this.ITEMS_POR_PAGINA;
 
           if (this.infiniteScroll) {
-            this.infiniteScroll.disabled = false;
+            this.infiniteScroll.disabled = !this.hayMasPaginas;
           }
         },
         error: () => {
@@ -183,17 +276,34 @@ export class Tab2Page implements OnInit, OnDestroy {
     }
 
     this.cargandoInicial = true;
-    this.incidenciasService.buscarPorCodigo(termino).subscribe({
-      next: (data) => {
-        this.incidencias = data;
-        this.hayMasPaginas = false;
-        this.cargandoInicial = false;
-      },
-      error: () => {
-        this.incidencias = [];
-        this.cargandoInicial = false;
-      },
-    });
+    this.incidenciasService
+      .buscarPorCodigo(termino)
+      .pipe(
+        finalize(() => {
+          this.cargandoInicial = false;
+        }),
+      )
+      .subscribe({
+        next: (data) => {
+          this.incidencias = this.combinarSinDuplicados([], data || []);
+          this.hayMasPaginas = false;
+          if (this.infiniteScroll) {
+            this.infiniteScroll.disabled = true;
+          }
+        },
+        error: () => {
+          this.incidencias = [];
+          this.hayMasPaginas = false;
+        },
+      });
+  }
+
+  /**
+   * Limpia el buscador y restaura la paginación normal.
+   */
+  limpiarBusqueda(): void {
+    this.terminoBusqueda = '';
+    this.cargarIncidencias();
   }
 
   /**

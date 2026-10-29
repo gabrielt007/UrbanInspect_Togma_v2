@@ -11,7 +11,16 @@ $RECYCLE.BIN/
 
 *.log
 log.txt
+node_modules/
+www/
+dist/
+.angular/
+.vscode/
 
+src/environments/environment.ts
+src/environments/environment.prod.ts
+
+*.log
 
 /.sourcemaps
 /.versions
@@ -33,6 +42,12 @@ log.txt
 /node_modules
 npm-debug.log
 yarn-error.log
+
+# Local environment variables and credentials
+.env
+.env.*
+!.env.example
+/src/environments/*.local.ts
 
 # IDEs and editors
 .idea/

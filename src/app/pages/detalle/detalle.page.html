@@ -150,48 +150,62 @@
       <ion-card-header>
         <ion-card-subtitle>
           <ion-icon name="swap-horizontal-outline" aria-hidden="true"></ion-icon>
-          Cambiar Estado de Incidencia (R9)
+          Gestión de Estado (R9)
         </ion-card-subtitle>
       </ion-card-header>
       <ion-card-content>
-        <ion-list lines="none">
-          <ion-item>
-            <ion-select
-              label="Nuevo estado"
-              labelPlacement="stacked"
-              [(ngModel)]="nuevoEstado"
-              interface="popover">
-              <ion-select-option value="pendiente">Pendiente</ion-select-option>
-              <ion-select-option value="en_proceso">En Proceso</ion-select-option>
-              <ion-select-option value="resuelta">Resuelta</ion-select-option>
-            </ion-select>
-          </ion-item>
-          <ion-item>
-            <ion-textarea
-              label="Observación obligatoria *"
-              labelPlacement="stacked"
-              placeholder="Justifica el cambio de estado con observaciones de campo..."
-              [(ngModel)]="observacion"
-              [autoGrow]="true"
-              [rows]="3"
-              [maxlength]="500"
-              counter="true">
-            </ion-textarea>
-          </ion-item>
-        </ion-list>
+        @if (puedeCambiarEstado) {
+          <ion-list lines="none">
+            <ion-item>
+              <ion-select
+                label="Nuevo estado"
+                labelPlacement="stacked"
+                [(ngModel)]="nuevoEstado"
+                interface="popover">
+                @for (est of estadosPermitidos; track est) {
+                  <ion-select-option [value]="est">
+                    {{ est === 'en_proceso' ? 'En Proceso' : (est | titlecase) }}
+                  </ion-select-option>
+                }
+              </ion-select>
+            </ion-item>
+            <ion-item>
+              <ion-textarea
+                label="Observación obligatoria *"
+                labelPlacement="stacked"
+                placeholder="Justifica el cambio de estado con observaciones de campo..."
+                [(ngModel)]="observacion"
+                [autoGrow]="true"
+                [rows]="3"
+                [maxlength]="500"
+                counter="true">
+              </ion-textarea>
+            </ion-item>
+          </ion-list>
 
-        <ion-button
-          expand="block"
-          [disabled]="!formularioValido() || actualizando"
-          (click)="cambiarEstado()"
-          class="btn-cambiar-estado">
-          @if (actualizando) {
-            <ion-spinner name="crescent" class="btn-spinner"></ion-spinner>
-          } @else {
-            <ion-icon name="checkmark-circle-outline" slot="start"></ion-icon>
-            Actualizar Estado
-          }
-        </ion-button>
+          <ion-button
+            expand="block"
+            [disabled]="!formularioValido() || actualizando"
+            (click)="cambiarEstado()"
+            class="btn-cambiar-estado">
+            @if (actualizando) {
+              <ion-spinner name="crescent" class="btn-spinner"></ion-spinner>
+            } @else {
+              <ion-icon name="checkmark-circle-outline" slot="start"></ion-icon>
+              Actualizar Estado
+            }
+          </ion-button>
+        } @else {
+          <div class="estado-final-container">
+            <ion-badge color="success" class="estado-final-badge">
+              <ion-icon name="checkmark-circle-outline"></ion-icon>
+              INCIDENCIA RESUELTA
+            </ion-badge>
+            <p class="estado-final-texto">
+              Esta incidencia ha completado su ciclo de vida y no admite modificaciones posteriores.
+            </p>
+          </div>
+        }
       </ion-card-content>
     </ion-card>
 

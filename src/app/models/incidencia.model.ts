@@ -33,25 +33,27 @@ export interface CambioEstado {
   fecha: string;              // ISO 8601
 }
 
-/** Modelo principal de incidencia (alineado con MockAPI y requerimientos R2, R3, R5, R9) */
+/** Modelo principal de incidencia */
 export interface Incidencia {
   id?: string;
   codigo: string;             // Generado automáticamente (INC-XXXX)
-  tipo: string;               // Tipo de incidencia ('bache', 'alumbrado', etc.)
-  categoria?: CategoriaIncidencia; // Alias compatible
-  titulo?: string;            // Título descriptivo
+  tipo: CategoriaIncidencia;  // Campo canónico de tipo de incidencia
   descripcion: string;        // Descripción del problema
-  direccion?: string;         // Dirección física o referencia
-  sector?: string;            // Sector / Barrio
-  fecha?: string;             // Fecha actual ISO
-  fechaCreacion: string;      // ISO 8601
-  estado: EstadoIncidencia;   // 'pendiente' por defecto
-  prioridad?: PrioridadIncidencia; // 'alta' | 'media' | 'baja'
-  fotografia?: string;        // Base64 data URI o URL
-  foto?: string;              // Alias compatible
+  direccion: string;          // Dirección física o referencia
+  sector: string;             // Sector / Barrio
+  fecha: string;              // Fecha ISO 8601
+  estado: EstadoIncidencia;   // 'pendiente' | 'en_proceso' | 'resuelta'
+  prioridad: PrioridadIncidencia; // 'alta' | 'media' | 'baja'
+  fotografia: string;         // Fotografía capturada (DataUrl o URL)
   coordenadas?: Coordenadas;  // Ubicación GPS o manual
   clima?: DatosClima;         // Condiciones climáticas de OpenWeatherMap
   cambiosEstado?: CambioEstado[]; // Historial de transiciones
+  
+  // Campos opcionales para compatibilidad en lectura de registros previos
+  categoria?: CategoriaIncidencia;
+  foto?: string;
+  titulo?: string;
+  fechaCreacion?: string;
   fechaActualizacion?: string;
 }
 
@@ -65,8 +67,8 @@ export interface RespuestaPaginada<T> {
 
 /** Resultado de la captura de foto */
 export interface ResultadoFoto {
-  dataUrl: string;            // base64 para previsualización
-  rutaPersistente: string;    // ruta en Filesystem para almacenamiento
+  dataUrl: string;            // base64/dataUrl para previsualización y guardado
+  rutaPersistente?: string;   // ruta opcional en Filesystem para almacenamiento nativo
 }
 
 /** Borrador de formulario para recuperación */

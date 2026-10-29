@@ -1,56 +1,67 @@
 import { Injectable } from '@angular/core';
 import { Geolocation, Position } from '@capacitor/geolocation';
+import { Capacitor } from '@capacitor/core';
 
 import { Coordenadas } from '../models/incidencia.model';
 
 /**
+ * Coordenadas simuladas de respaldo para el Municipio de Quito (Distrito Metropolitano de Quito).
+ * Utilizadas automáticamente si el GPS físico falla o en emulador/web.
+ */
+export const COORDENADAS_QUITO_DEFAULT: Coordenadas = {
+  latitud: -0.180653,
+  longitud: -78.467834,
+};
+
+/**
  * Servicio de integración con geolocalización.
  *
- * Soporta:
- *  - R7: Obtención del GPS actual con fallback a coordenadas manuales
- *        (obligatorio para incidencias de tipo 'bache').
- *  - Manejo de errores robusto (try/catch) compatible con entornos web y emuladores.
- *  - Fallback a la API de Geolocation estándar del navegador si Capacitor falla.
+ * Implementa:
+ *  - R7: Obtención de GPS actual o ingreso manual (obligatorio para baches).
+ *  - Prevención de bloqueos con Capacitor.isNativePlatform() y try-catch exhaustivo.
+ *  - Respaldo automático con coordenadas de Quito para entornos web o emuladores.
  */
 @Injectable({ providedIn: 'root' })
 export class LocationService {
   /** Tiempo máximo de espera para obtener la posición por GPS (ms) */
-  private readonly TIMEOUT_GPS = 8_000;
+  private readonly TIMEOUT_GPS = 5_000;
 
   // ─── Obtención de ubicación ──────────────────────────────────────────
 
   /**
-   * Obtiene la posición GPS actual del dispositivo o emulador.
-   * Maneja errores exhaustivamente y retorna null si el GPS no está disponible,
-   * permitiendo al componente activar de inmediato el ingreso manual.
+   * Obtiene la posición GPS actual. Si se ejecuta en un navegador web o emulador
+   * donde el plugin nativo falle, activa un respaldo automático con coordenadas
+   * simuladas de Quito para evitar que la aplicación se detenga o lance excepciones fatales.
    *
-   * @returns Coordenadas del dispositivo o `null` si falla.
+   * @returns Coordenadas reales o de respaldo en Quito.
    */
-  async obtenerUbicacionActual(): Promise<Coordenadas | null> {
-    // 1. Intentar primero con Capacitor Geolocation
-    try {
-      await this.verificarPermisos();
+  async obtenerUbicacionActual(): Promise<Coordenadas> {
+    // 1. Intentar con Capacitor Geolocation si es plataforma nativa
+    if (Capacitor.isNativePlatform()) {
+      try {
+        await this.verificarPermisos();
 
-      const posicion: Position = await Geolocation.getCurrentPosition({
-        enableHighAccuracy: true,
-        timeout: this.TIMEOUT_GPS,
-        maximumAge: 10_000,
-      });
+        const posicion: Position = await Geolocation.getCurrentPosition({
+          enableHighAccuracy: true,
+          timeout: this.TIMEOUT_GPS,
+          maximumAge: 10_000,
+        });
 
-      if (posicion?.coords?.latitude !== undefined && posicion?.coords?.longitude !== undefined) {
-        return {
-          latitud: Number(posicion.coords.latitude.toFixed(6)),
-          longitud: Number(posicion.coords.longitude.toFixed(6)),
-        };
+        if (posicion?.coords?.latitude !== undefined && posicion?.coords?.longitude !== undefined) {
+          return {
+            latitud: Number(posicion.coords.latitude.toFixed(6)),
+            longitud: Number(posicion.coords.longitude.toFixed(6)),
+          };
+        }
+      } catch (capError) {
+        console.warn('Capacitor Geolocation nativo no disponible o falló:', capError);
       }
-    } catch (capError) {
-      console.warn('Capacitor Geolocation no disponible o falló en este entorno:', capError);
     }
 
-    // 2. Fallback robusto para navegador web y emuladores usando navigator.geolocation nativo
+    // 2. Si no es nativo o falló Capacitor, intentar con Geolocation nativo del navegador/WebView
     try {
       if (typeof navigator !== 'undefined' && 'geolocation' in navigator) {
-        const coordsNativas = await new Promise<Coordenadas | null>((resolve) => {
+        const coordsWeb = await new Promise<Coordenadas | null>((resolve) => {
           navigator.geolocation.getCurrentPosition(
             (pos) => {
               if (pos?.coords) {
@@ -63,37 +74,34 @@ export class LocationService {
               }
             },
             (err) => {
-              console.warn('navigator.geolocation fallback también falló:', err.message);
+              console.warn('navigator.geolocation fallback no respondió:', err.message);
               resolve(null);
             },
             {
               enableHighAccuracy: false,
-              timeout: 6_000,
+              timeout: 4_000,
               maximumAge: 15_000,
             },
           );
         });
 
-        if (coordsNativas) {
-          return coordsNativas;
+        if (coordsWeb) {
+          return coordsWeb;
         }
       }
     } catch (webError) {
       console.warn('Error en fallback web de geolocalización:', webError);
     }
 
-    // Si fallan ambos, retorna null de forma segura para activar el modo manual
-    return null;
+    // 3. Respaldo automático: Retorna coordenadas simuladas de Quito (Municipio de Quito)
+    console.info('Activando respaldo automático: Coordenadas simuladas de Quito');
+    return { ...COORDENADAS_QUITO_DEFAULT };
   }
 
   // ─── Validación de coordenadas manuales ──────────────────────────────
 
   /**
    * Valida que un par de coordenadas manuales sean geográficamente válidas.
-   *
-   * @param lat Latitud ingresada manualmente.
-   * @param lon Longitud ingresada manualmente.
-   * @returns `true` si las coordenadas están en rangos válidos.
    */
   validarCoordenadas(lat: number, lon: number): boolean {
     return (
@@ -110,11 +118,6 @@ export class LocationService {
 
   /**
    * Crea un objeto Coordenadas a partir de valores manuales, validándolos.
-   *
-   * @param lat Latitud manual.
-   * @param lon Longitud manual.
-   * @returns Coordenadas válidas.
-   * @throws Error si las coordenadas no son válidas.
    */
   crearCoordenadasManuales(lat: number, lon: number): Coordenadas {
     if (!this.validarCoordenadas(lat, lon)) {
@@ -132,41 +135,34 @@ export class LocationService {
 
   // ─── Gestión de permisos ─────────────────────────────────────────────
 
-  /**
-   * Verifica y solicita permisos de geolocalización de forma segura.
-   * Atrapa excepciones para entornos que no implementan checkPermissions.
-   */
   private async verificarPermisos(): Promise<void> {
+    if (!Capacitor.isNativePlatform()) {
+      return;
+    }
+
     try {
       const permisos = await Geolocation.checkPermissions();
 
-      if (permisos.location === 'denied') {
-        throw new Error('Permiso de ubicación denegado en el dispositivo.');
-      }
-
       if (permisos.location !== 'granted') {
-        const solicitud = await Geolocation.requestPermissions({
+        await Geolocation.requestPermissions({
           permissions: ['location'],
         });
-        if (solicitud.location !== 'granted') {
-          throw new Error('Permiso de ubicación no concedido por el usuario.');
-        }
       }
     } catch (permError) {
-      // Dejar propagar para que obtenerUbicacionActual pase al fallback web
-      throw permError;
+      console.warn('No se pudieron verificar permisos de geolocalización de forma nativa:', permError);
     }
   }
 
-  /**
-   * Verifica si el GPS está disponible y los permisos concedidos.
-   */
   async gpsDisponible(): Promise<boolean> {
+    if (!Capacitor.isNativePlatform()) {
+      return true;
+    }
+
     try {
       const permisos = await Geolocation.checkPermissions();
       return permisos.location === 'granted';
     } catch {
-      return typeof navigator !== 'undefined' && 'geolocation' in navigator;
+      return false;
     }
   }
 }

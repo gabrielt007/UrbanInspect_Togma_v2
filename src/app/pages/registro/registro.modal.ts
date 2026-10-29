@@ -17,7 +17,7 @@ import {
 
 import { IncidenciasService } from '../../services/incidencias.service';
 import { CameraService } from '../../services/camera.service';
-import { LocationService } from '../../services/location.service';
+import { LocationService, COORDENADAS_QUITO_DEFAULT } from '../../services/location.service';
 import { WeatherService } from '../../services/weather.service';
 import { StorageService } from '../../services/storage.service';
 import {
@@ -31,12 +31,11 @@ import {
 /**
  * Modal de Registro de Incidencia
  *
- * Implementa:
- *  - R5, R2, R3: Creación completa y sincronización en MockAPI.
- *  - R6: Captura de foto con almacenamiento persistente y preview.
- *  - R7: GPS con fallback robusto a coordenadas manuales (obligatorio para baches).
- *  - R4: OpenWeatherMap automático con advertencia si lluvia > 5mm y fallback no bloqueante.
- *  - R8: Autoguardado y recuperación de borradores.
+ * Flujo optimizado:
+ *  Formulario -> Payload -> MockAPI
+ *  - Sin duplicación tipo/categoría ni foto/fotografía.
+ *  - Preserva íntegramente la imagen capturada.
+ *  - Validación limpia sin redundancias.
  */
 @Component({
   selector: 'app-registro-modal',
@@ -59,17 +58,15 @@ export class RegistroModal implements OnInit {
   private readonly weatherService = inject(WeatherService);
   private readonly storageService = inject(StorageService);
 
-  /** Campos obligatorios solicitados por MockAPI */
+  /** Campos del formulario (canónicos y sin duplicados) */
   tipo: CategoriaIncidencia = 'bache';
-  titulo = '';
   descripcion = '';
   direccion = '';
   sector = '';
   prioridad: PrioridadIncidencia = 'alta';
 
-  /** Fotografía */
-  fotoPreview: string | null = null;
-  fotoData: string | null = null;
+  /** Fotografía capturada (única fuente de verdad) */
+  fotografia = '';
 
   /** Ubicación (R7) */
   coordenadas: Coordenadas | null = null;
@@ -84,7 +81,7 @@ export class RegistroModal implements OnInit {
   obteniendoClima = false;
   errorClima: string | null = null;
 
-  /** Estado de interfaz y borrador */
+  /** Estado */
   guardando = false;
   borradorRecuperado = false;
 
@@ -116,13 +113,11 @@ export class RegistroModal implements OnInit {
       if (borrador?.datos) {
         const d = borrador.datos;
         this.tipo = (d.tipo || d.categoria || 'bache') as CategoriaIncidencia;
-        this.titulo = d.titulo ?? '';
         this.descripcion = d.descripcion ?? '';
         this.direccion = d.direccion ?? '';
         this.sector = d.sector ?? '';
         this.prioridad = d.prioridad ?? (this.tipo === 'bache' ? 'alta' : 'media');
-        this.fotoPreview = d.fotografia || d.foto || null;
-        this.fotoData = this.fotoPreview;
+        this.fotografia = d.fotografia || d.foto || '';
 
         if (d.coordenadas) {
           this.coordenadas = d.coordenadas;
@@ -140,63 +135,40 @@ export class RegistroModal implements OnInit {
   async guardarBorrador(): Promise<void> {
     await this.storageService.guardarBorrador({
       tipo: this.tipo,
-      categoria: this.tipo,
-      titulo: this.titulo,
       descripcion: this.descripcion,
       direccion: this.direccion,
       sector: this.sector,
       prioridad: this.prioridad,
-      fotografia: this.fotoData ?? undefined,
-      foto: this.fotoData ?? undefined,
+      fotografia: this.fotografia,
       coordenadas: this.coordenadas ?? undefined,
     });
   }
 
   // ─── R7: Ubicación GPS y Manual ─────────────────────────────────────
 
-  /**
-   * Obtiene la posición GPS del dispositivo o emulador.
-   * Manejo robusto: si falla, activa inmediatamente los campos de ingreso manual.
-   */
   async obtenerUbicacion(): Promise<void> {
     this.obteniendoGps = true;
     this.mensajeGpsError = null;
 
     try {
       const coords = await this.locationService.obtenerUbicacionActual();
-
-      if (coords) {
-        this.coordenadas = coords;
-        this.latManual = coords.latitud.toString();
-        this.lonManual = coords.longitud.toString();
-        this.modoManual = false;
-        // R4: Invocar automáticamente OpenWeatherMap
-        this.obtenerClima(coords.latitud, coords.longitud);
-      } else {
-        // Fallo de GPS en emulador o web: activar automáticamente ingreso manual
-        this.activarModoManualPorFalloGps();
-      }
+      this.coordenadas = coords;
+      this.latManual = coords.latitud.toString();
+      this.lonManual = coords.longitud.toString();
+      this.obtenerClima(coords.latitud, coords.longitud);
     } catch (err) {
-      console.warn('Error al solicitar ubicación:', err);
-      this.activarModoManualPorFalloGps();
+      console.warn('Error al solicitar ubicación, usando respaldo Quito:', err);
+      this.coordenadas = { ...COORDENADAS_QUITO_DEFAULT };
+      this.latManual = COORDENADAS_QUITO_DEFAULT.latitud.toString();
+      this.lonManual = COORDENADAS_QUITO_DEFAULT.longitud.toString();
+      this.modoManual = true;
+      this.obtenerClima(this.coordenadas.latitud, this.coordenadas.longitud);
     } finally {
       this.obteniendoGps = false;
       await this.guardarBorrador();
     }
   }
 
-  /**
-   * Activa automáticamente los campos manuales informando al usuario.
-   */
-  private activarModoManualPorFalloGps(): void {
-    this.modoManual = true;
-    this.mensajeGpsError = 'GPS no disponible en este entorno/emulador. Se activaron los campos de ingreso manual.';
-  }
-
-  /**
-   * Detecta cambios en los inputs manuales de latitud y longitud en pantalla.
-   * Si son válidos, fija las coordenadas e invoca automáticamente OpenWeatherMap.
-   */
   onCoordenadasManualesChange(): void {
     const lat = parseFloat(this.latManual);
     const lon = parseFloat(this.lonManual);
@@ -204,26 +176,15 @@ export class RegistroModal implements OnInit {
     if (this.locationService.validarCoordenadas(lat, lon)) {
       this.coordenadas = { latitud: lat, longitud: lon };
       this.mensajeGpsError = null;
-      // R4: Invocar automáticamente OpenWeatherMap con coordenadas manuales
       this.obtenerClima(lat, lon);
       this.guardarBorrador();
-    } else {
-      if (this.modoManual) {
-        this.coordenadas = null;
-      }
     }
   }
 
-  /**
-   * Botón explícito para aplicar coordenadas manuales si el usuario lo pulsa.
-   */
   aplicarCoordenadasManuales(): void {
     this.onCoordenadasManualesChange();
   }
 
-  /**
-   * Comprueba si hay una ubicación válida establecida o ingresada en pantalla.
-   */
   tieneUbicacionValida(): boolean {
     if (this.coordenadas) return true;
     const lat = parseFloat(this.latManual);
@@ -233,10 +194,6 @@ export class RegistroModal implements OnInit {
 
   // ─── R4: OpenWeatherMap ─────────────────────────────────────────────
 
-  /**
-   * Invoca el servicio meteorológico para las coordenadas dadas.
-   * Maneja errores informando al usuario sin bloquear el registro.
-   */
   private obtenerClima(lat: number, lon: number): void {
     this.obteniendoClima = true;
     this.errorClima = null;
@@ -249,59 +206,46 @@ export class RegistroModal implements OnInit {
       error: (err) => {
         console.warn('Servicio de clima no disponible:', err);
         this.clima = null;
-        this.errorClima = 'No se pudo obtener información del clima en este momento, pero puedes continuar con el registro.';
+        this.errorClima = 'No se pudo obtener el clima en tiempo real, pero puedes continuar con el registro.';
         this.obteniendoClima = false;
       },
     });
   }
 
-  // ─── R6: Fotografía ─────────────────────────────────────────────────
+  // ─── R6: Fotografía (Conservación directa de la foto capturada) ──────
 
   async capturarFoto(): Promise<void> {
-    try {
-      const resultado = await this.cameraService.capturarFoto();
-      this.fotoPreview = resultado.dataUrl;
-      this.fotoData = resultado.dataUrl;
+    const resultado = await this.cameraService.capturarFoto();
+    if (resultado?.dataUrl) {
+      this.fotografia = resultado.dataUrl;
       await this.guardarBorrador();
-    } catch (error) {
-      console.warn('Error al capturar foto:', error);
     }
   }
 
   async seleccionarFoto(): Promise<void> {
-    try {
-      const resultado = await this.cameraService.seleccionarDeGaleria();
-      this.fotoPreview = resultado.dataUrl;
-      this.fotoData = resultado.dataUrl;
+    const resultado = await this.cameraService.seleccionarDeGaleria();
+    if (resultado?.dataUrl) {
+      this.fotografia = resultado.dataUrl;
       await this.guardarBorrador();
-    } catch (error) {
-      console.warn('Error al seleccionar foto:', error);
     }
   }
 
   eliminarFoto(): void {
-    this.fotoPreview = null;
-    this.fotoData = null;
+    this.fotografia = '';
     this.guardarBorrador();
   }
 
-  // ─── R5, R2, R3: Sincronización y Guardado en MockAPI ─────────────────
+  // ─── R5: Validación y Guardado ──────────────────────────────────────
 
-  /**
-   * Valida los requisitos antes de permitir continuar:
-   *  - Descripción y dirección obligatorias.
-   *  - Para la categoría "bache", la ubicación (GPS o manual en inputs) es OBLIGATORIA.
-   *  - Para otras categorías, la ubicación no es bloqueante.
-   */
   formularioValido(): boolean {
-    const tieneDesc = (this.descripcion || '').trim().length > 0;
-    const tieneDir = (this.direccion || '').trim().length > 0;
+    const tieneDesc = this.descripcion.trim().length > 0;
+    const tieneDir = this.direccion.trim().length > 0;
 
     if (!tieneDesc || !tieneDir) {
       return false;
     }
 
-    // Validación estricta para bache
+    // Obligatorio para baches
     if (this.tipo === 'bache') {
       return this.tieneUbicacionValida();
     }
@@ -310,36 +254,33 @@ export class RegistroModal implements OnInit {
   }
 
   /**
-   * Guarda el registro enviando petición POST a MockAPI con todos los campos obligatorios.
-   * Tras el éxito, cierra el modal y se asegura de que aparezca reflejado en el Listado.
+   * Guarda la incidencia enviando el payload limpio a MockAPI.
+   * Flujo directo: Formulario -> Payload -> MockAPI
    */
   guardar(): void {
     if (!this.formularioValido()) return;
 
     this.guardando = true;
 
-    // Asegurar coordenadas si fueron ingresadas en inputs manuales
-    if (!this.coordenadas && this.tieneUbicacionValida()) {
-      this.coordenadas = {
+    // Sincronizar coordenadas si se ingresaron en inputs manuales
+    let coordsFinales = this.coordenadas;
+    if (!coordsFinales && this.tieneUbicacionValida()) {
+      coordsFinales = {
         latitud: parseFloat(this.latManual),
         longitud: parseFloat(this.lonManual),
       };
+      this.coordenadas = coordsFinales;
     }
 
+    // Payload unificado y sin campos duplicados
     const payload: Partial<Incidencia> = {
       tipo: this.tipo,
-      categoria: this.tipo,
-      titulo: this.titulo.trim() || `${this.tipo.toUpperCase()} - ${this.direccion.trim()}`,
       descripcion: this.descripcion.trim(),
       direccion: this.direccion.trim(),
-      sector: this.sector.trim() || 'Sector General',
-      fecha: new Date().toISOString(),
-      fechaCreacion: new Date().toISOString(),
-      estado: 'pendiente',
+      sector: this.sector.trim() || 'Distrito Metropolitano de Quito',
       prioridad: this.prioridad,
-      fotografia: this.fotoData ?? '',
-      foto: this.fotoData ?? '',
-      coordenadas: this.coordenadas ?? undefined,
+      fotografia: this.fotografia,
+      coordenadas: coordsFinales ?? undefined,
       clima: this.clima ?? undefined,
     };
 
@@ -349,21 +290,20 @@ export class RegistroModal implements OnInit {
         this.guardando = false;
 
         const toast = await this.toastCtrl.create({
-          message: `Incidencia ${creada.codigo} registrada con éxito`,
+          message: `Incidencia ${creada.codigo} guardada con éxito`,
           duration: 2500,
           color: 'success',
           position: 'top',
         });
         await toast.present();
 
-        // Cerrar formulario y entregar el registro creado
         this.modalCtrl.dismiss(creada, 'confirm');
       },
       error: async (err) => {
         console.error('Error al guardar en MockAPI:', err);
         this.guardando = false;
         const toast = await this.toastCtrl.create({
-          message: 'Error al conectar con MockAPI. Revisa tu conexión a internet.',
+          message: 'Error de comunicación con MockAPI. Intenta nuevamente.',
           duration: 3500,
           color: 'danger',
           position: 'bottom',

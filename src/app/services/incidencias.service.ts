@@ -1,21 +1,21 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
-import { Observable, switchMap, map, tap, Subject } from 'rxjs';
+import { Observable, switchMap, map, tap, Subject, of, timeout, catchError } from 'rxjs';
 
 import { environment } from '../../environments/environment';
 import {
   Incidencia,
   EstadoIncidencia,
   CambioEstado,
+  CategoriaIncidencia,
 } from '../models/incidencia.model';
 
 /**
- * Servicio de conexión HTTP con el MockAPI para gestionar incidencias.
+ * Servicio de conexión HTTP con MockAPI para gestionar incidencias.
  *
- * Soporta:
- *  - R2, R3: Obtención paginada y reactividad del listado general.
- *  - R5: Creación de incidencias con todos los campos requeridos por MockAPI.
- *  - R9: Actualización de estados con observaciones e historial.
+ * Flujo de creación:
+ * Formulario -> Payload -> MockAPI
+ * Conserva íntegramente los datos y la fotografía sin transformaciones redundantes.
  */
 @Injectable({ providedIn: 'root' })
 export class IncidenciasService {
@@ -26,140 +26,171 @@ export class IncidenciasService {
   private readonly incidenciaCreadaSubject = new Subject<Incidencia>();
   readonly incidenciaCreada$ = this.incidenciaCreadaSubject.asObservable();
 
-  // ─── R3: Obtención paginada ──────────────────────────────────────────
+  /** Canal reactivo para notificar la actualización de estados en tiempo real */
+  private readonly incidenciaActualizadaSubject = new Subject<Incidencia>();
+  readonly incidenciaActualizada$ = this.incidenciaActualizadaSubject.asObservable();
 
-  /**
-   * Obtiene incidencias con paginación desde el servidor (MockAPI).
-   *
-   * @param page  Número de página (1-indexed).
-   * @param limit Cantidad de items por página.
-   * @returns Observable con el arreglo de incidencias.
-   */
+  // ─── Obtención de Incidencias ────────────────────────────────────────
+
   obtenerIncidencias(page: number = 1, limit: number = 10): Observable<Incidencia[]> {
     const params = new HttpParams()
       .set('page', page.toString())
       .set('limit', limit.toString());
 
-    return this.http.get<Incidencia[]>(this.apiUrl, { params });
+    return this.http.get<Incidencia[]>(this.apiUrl, { params }).pipe(
+      timeout(8_000),
+      map((items) =>
+        (items || []).map((i) => ({
+          ...i,
+          categoria: i.categoria || i.tipo,
+          foto: i.foto || i.fotografia,
+        })),
+      ),
+      catchError((error) => {
+        console.warn('Error al obtener incidencias desde MockAPI:', error);
+        return of([] as Incidencia[]);
+      }),
+    );
   }
 
-  /**
-   * Obtiene una incidencia individual por su ID.
-   */
   obtenerPorId(id: string): Observable<Incidencia> {
-    return this.http.get<Incidencia>(`${this.apiUrl}/${id}`);
+    return this.http.get<Incidencia>(`${this.apiUrl}/${id}`).pipe(
+      timeout(8_000),
+      map((i) =>
+        i
+          ? {
+              ...i,
+              categoria: i.categoria || i.tipo,
+              foto: i.foto || i.fotografia,
+            }
+          : (null as unknown as Incidencia),
+      ),
+      catchError((error) => {
+        console.warn(`Error al consultar incidencia ${id}:`, error);
+        return of(null as unknown as Incidencia);
+      }),
+    );
   }
 
-  /**
-   * Busca incidencias filtrando por código en MockAPI.
-   */
   buscarPorCodigo(codigo: string): Observable<Incidencia[]> {
-    const params = new HttpParams().set('codigo', codigo);
-    return this.http.get<Incidencia[]>(this.apiUrl, { params });
+    const termino = (codigo || '').trim();
+    if (!termino) {
+      return of([] as Incidencia[]);
+    }
+
+    const params = new HttpParams().set('search', termino);
+    return this.http.get<Incidencia[]>(this.apiUrl, { params }).pipe(
+      timeout(8_000),
+      map((items) =>
+        (items || [])
+          .map((i) => ({
+            ...i,
+            categoria: i.categoria || i.tipo,
+            foto: i.foto || i.fotografia,
+          }))
+          .filter((i) => {
+            const termLower = termino.toLowerCase();
+            return (
+              i.codigo?.toLowerCase().includes(termLower) ||
+              i.id?.toString() === termino ||
+              (i.tipo || i.categoria)?.toLowerCase().includes(termLower)
+            );
+          }),
+      ),
+      catchError((error) => {
+        console.warn('Error al buscar por código en MockAPI:', error);
+        return of([] as Incidencia[]);
+      }),
+    );
   }
 
-  // ─── R5: Creación de incidencias ─────────────────────────────────────
+  // ─── Creación de Incidencias (Flujo directo sin duplicados) ──────────
 
   /**
-   * Envía una petición POST a la URL de MockAPI con todos los campos obligatorios:
-   *  - codigo generado (INC-XXXXX)
-   *  - tipo
-   *  - descripcion
-   *  - direccion
-   *  - sector
-   *  - fecha actual
-   *  - estado ("pendiente")
-   *  - prioridad ('alta' | 'media' | 'baja')
-   *  - fotografia
-   *  - coordenadas y clima (si aplican)
-   *
-   * Al finalizar con éxito, emite por `incidenciaCreada$` para actualizar
-   * de forma inmediata el listado general en la aplicación.
-   *
-   * @param datos Datos de la nueva incidencia.
-   * @returns Observable con la incidencia creada.
+   * Envía la incidencia a MockAPI conservando la fotografía capturada
+   * y los campos unificados sin duplicaciones innecesarias:
+   *  - tipo (único campo de categoría)
+   *  - fotografia (único campo de imagen)
+   *  - fecha (único campo temporal)
    */
   crearIncidencia(datos: Partial<Incidencia>): Observable<Incidencia> {
-    const ahora = new Date().toISOString();
-    const codigoGenerado = datos.codigo || this.generarCodigo();
-    const tipo = datos.tipo || datos.categoria || 'otro';
-
-    const nuevaIncidencia: Incidencia = {
-      codigo: codigoGenerado,
-      tipo: tipo,
-      categoria: (datos.categoria || tipo) as any,
-      titulo: datos.titulo || `${tipo.toUpperCase()} - ${datos.direccion || datos.sector || 'Incidencia'}`,
+    const payload: Incidencia = {
+      codigo: datos.codigo || this.generarCodigo(),
+      tipo: (datos.tipo || datos.categoria || 'otro') as CategoriaIncidencia,
       descripcion: (datos.descripcion || '').trim(),
       direccion: (datos.direccion || '').trim(),
       sector: (datos.sector || '').trim(),
-      fecha: datos.fecha || ahora,
-      fechaCreacion: datos.fechaCreacion || datos.fecha || ahora,
+      fecha: datos.fecha || new Date().toISOString(),
       estado: 'pendiente',
       prioridad: datos.prioridad || 'media',
       fotografia: datos.fotografia || datos.foto || '',
-      foto: datos.foto || datos.fotografia || '',
       coordenadas: datos.coordenadas,
       clima: datos.clima,
       cambiosEstado: [],
     };
 
-    return this.http.post<Incidencia>(this.apiUrl, nuevaIncidencia).pipe(
+    return this.http.post<Incidencia>(this.apiUrl, payload).pipe(
+      timeout(10_000),
+      map((creada) => ({
+        ...creada,
+        categoria: creada.categoria || creada.tipo,
+        foto: creada.foto || creada.fotografia,
+      })),
       tap((creada) => {
-        // Notificar a las pestañas suscritas (Listado General Tab2, Dashboard Tab1)
         this.notificarNuevaIncidencia(creada);
       }),
     );
   }
 
-  /**
-   * Notifica manualmente la creación de una incidencia a los suscriptores.
-   */
   notificarNuevaIncidencia(incidencia: Incidencia): void {
     this.incidenciaCreadaSubject.next(incidencia);
   }
 
-  // ─── R9: Actualización de estados con observaciones ──────────────────
+  // ─── Actualización de estados (R9) ───────────────────────────────────
 
-  /**
-   * Actualiza el estado de una incidencia y registra la transición con una
-   * observación en el historial de cambios.
-   *
-   * @param id           ID de la incidencia.
-   * @param nuevoEstado  Nuevo estado a asignar.
-   * @param observacion  Justificación del cambio de estado.
-   * @returns Observable con la incidencia actualizada.
-   */
   actualizarEstado(
     id: string,
     nuevoEstado: EstadoIncidencia,
     observacion: string,
   ): Observable<Incidencia> {
     return this.obtenerPorId(id).pipe(
-      map((incidencia) => {
+      switchMap((incidencia) => {
+        if (!incidencia) {
+          throw new Error(`Incidencia ${id} no encontrada`);
+        }
+
         const cambio: CambioEstado = {
-          estadoAnterior: incidencia.estado,
+          estadoAnterior: incidencia.estado || 'pendiente',
           estadoNuevo: nuevoEstado,
-          observacion,
+          observacion: observacion.trim(),
           fecha: new Date().toISOString(),
         };
 
-        return {
+        const payloadCompleto: Incidencia = {
+          ...incidencia,
           estado: nuevoEstado,
           fechaActualizacion: new Date().toISOString(),
           cambiosEstado: [...(incidencia.cambiosEstado ?? []), cambio],
         };
+
+        return this.http.put<Incidencia>(`${this.apiUrl}/${id}`, payloadCompleto);
       }),
-      switchMap((payload) =>
-        this.http.put<Incidencia>(`${this.apiUrl}/${id}`, payload),
-      ),
+      timeout(10_000),
+      map((actualizada) => ({
+        ...actualizada,
+        categoria: actualizada.categoria || actualizada.tipo,
+        foto: actualizada.foto || actualizada.fotografia,
+      })),
+      tap((actualizada) => {
+        this.notificarIncidenciaActualizada(actualizada);
+      }),
     );
   }
 
-  // ─── Utilidades ──────────────────────────────────────────────────────
+  notificarIncidenciaActualizada(incidencia: Incidencia): void {
+    this.incidenciaActualizadaSubject.next(incidencia);
+  }
 
-  /**
-   * Genera un código único con formato INC-XXXXXXXXX (timestamp base36).
-   */
   generarCodigo(): string {
     return `INC-${Date.now().toString(36).toUpperCase()}`;
   }

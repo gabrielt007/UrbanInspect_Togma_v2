@@ -1,3 +1,11 @@
+interface RuntimeConfig {
+  mockApiUrl?: string;
+  openWeatherMapApiKey?: string;
+}
+
+const runtimeConfig =
+  (globalThis as typeof globalThis & { __URBANINSPECT_CONFIG__?: RuntimeConfig }).__URBANINSPECT_CONFIG__ ?? {};
+
 export const environment = {
   production: false,
   mockApiUrl: 'https://6ae2c462bbb54129229a5db4.mockapi.io/incidencias',

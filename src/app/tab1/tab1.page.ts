@@ -1,5 +1,6 @@
-import { Component, inject, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { Component, inject } from '@angular/core';
+import type { OnInit, OnDestroy } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import {
   IonHeader, IonToolbar, IonTitle, IonContent,
@@ -13,10 +14,12 @@ import {
   listOutline, bookmarkOutline, warningOutline,
   arrowForwardOutline, statsChartOutline,
 } from 'ionicons/icons';
+import { finalize, merge } from 'rxjs';
+import type { Subscription } from 'rxjs';
 
+import type { Incidencia } from '../models/incidencia.model';
 import { IncidenciasService } from '../services/incidencias.service';
 import { StorageService } from '../services/storage.service';
-import { Incidencia } from '../models/incidencia.model';
 
 /**
  * Tab 1 – Dashboard / Inicio
@@ -25,6 +28,7 @@ import { Incidencia } from '../models/incidencia.model';
  *  - Indicadores rápidos (total, pendientes, en proceso, resueltas)
  *  - Cantidad de incidencias seguidas localmente
  *  - Últimas incidencias registradas como acceso directo
+ *  - Blindado contra estados de carga infinita si MockAPI falla
  */
 @Component({
   selector: 'app-tab1',
@@ -38,7 +42,7 @@ import { Incidencia } from '../models/incidencia.model';
     IonList, IonItem, IonLabel, IonChip, IonRefresher, IonRefresherContent,
   ],
 })
-export class Tab1Page implements OnInit {
+export class Tab1Page implements OnInit, OnDestroy {
   private readonly incidenciasService = inject(IncidenciasService);
   private readonly storageService = inject(StorageService);
 
@@ -52,8 +56,10 @@ export class Tab1Page implements OnInit {
   /** Últimas incidencias para acceso rápido */
   ultimasIncidencias: Incidencia[] = [];
 
-  /** Estado de carga */
+  /** Estado de carga protegido */
   cargando = true;
+
+  private subscripcionIncidencias?: Subscription;
 
   constructor() {
     addIcons({
@@ -64,7 +70,15 @@ export class Tab1Page implements OnInit {
   }
 
   ngOnInit(): void {
+    this.subscripcionIncidencias = merge(
+      this.incidenciasService.incidenciaCreada$,
+      this.incidenciasService.incidenciaActualizada$,
+    ).subscribe(() => this.cargarDashboard());
     this.cargarDashboard();
+  }
+
+  ngOnDestroy(): void {
+    this.subscripcionIncidencias?.unsubscribe();
   }
 
   ionViewWillEnter(): void {
@@ -72,7 +86,8 @@ export class Tab1Page implements OnInit {
   }
 
   /**
-   * Carga todos los datos del dashboard.
+   * Carga los datos del dashboard.
+   * Apaga obligatoriamente `cargando = false` ante cualquier escenario.
    */
   async cargarDashboard(): Promise<void> {
     try {
@@ -82,16 +97,23 @@ export class Tab1Page implements OnInit {
 
       this.codigosSeguidos = codigos.length;
 
-      this.incidenciasService.obtenerIncidencias(1, 50).subscribe({
-        next: (incidencias) => {
-          this.calcularEstadisticas(incidencias);
-          this.ultimasIncidencias = incidencias.slice(0, 5);
-          this.cargando = false;
-        },
-        error: () => {
-          this.cargando = false;
-        },
-      });
+      this.incidenciasService
+        .obtenerIncidencias(1, 50)
+        .pipe(
+          finalize(() => {
+            // Garantiza que el spinner se apague siempre, evitando carga infinita
+            this.cargando = false;
+          }),
+        )
+        .subscribe({
+          next: (incidencias) => {
+            this.calcularEstadisticas(incidencias || []);
+            this.ultimasIncidencias = (incidencias || []).slice(0, 5);
+          },
+          error: () => {
+            this.cargando = false;
+          },
+        });
     } catch {
       this.cargando = false;
     }

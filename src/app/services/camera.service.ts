@@ -1,155 +1,126 @@
 import { Injectable } from '@angular/core';
 import { Camera, CameraResultType, CameraSource, Photo } from '@capacitor/camera';
 import { Filesystem, Directory } from '@capacitor/filesystem';
+import { Capacitor } from '@capacitor/core';
 
 import { ResultadoFoto } from '../models/incidencia.model';
 
 /**
  * Servicio de integración con @capacitor/camera y @capacitor/filesystem
- * para captura, previsualización y almacenamiento persistente de fotos.
- *
- * Soporta:
- *  - R6: Captura de fotos con previsualización, manejo de permisos
- *        y almacenamiento persistente en el dispositivo.
- *
- * Flujo:
- *  1. Solicita permisos de cámara y sistema de archivos.
- *  2. Captura la foto desde la cámara o galería.
- *  3. Guarda la foto de forma persistente en el Filesystem de Capacitor.
- *  4. Retorna tanto el dataUrl (para previsualización) como la ruta persistente.
+ * para captura, previsualización y persistencia de fotos de incidencias.
  */
 @Injectable({ providedIn: 'root' })
 export class CameraService {
-  /** Directorio donde se almacenan las fotos de incidencias */
   private readonly DIRECTORIO_FOTOS = 'incidencias_fotos';
 
-  // ─── Captura principal ───────────────────────────────────────────────
+  // ─── Captura desde Cámara ──────────────────────────────────────────
 
   /**
-   * Captura una foto desde la cámara del dispositivo.
-   * Solicita permisos automáticamente si no los tiene.
-   *
-   * @returns Promise con el dataUrl para previsualización y la ruta persistente.
-   * @throws Error si el usuario deniega permisos o cancela la captura.
+   * Captura una fotografía desde la cámara del dispositivo.
+   * Retorna el dataUrl de la imagen real para su uso directo en la vista y en el payload.
    */
   async capturarFoto(): Promise<ResultadoFoto> {
-    await this.verificarPermisos();
+    try {
+      if (Capacitor.isNativePlatform()) {
+        await this.verificarPermisos();
+      }
 
-    const foto: Photo = await Camera.getPhoto({
-      quality: 80,
-      allowEditing: false,
-      resultType: CameraResultType.Base64,
-      source: CameraSource.Camera,
-      saveToGallery: false,
-      correctOrientation: true,
-      width: 1024,
-    });
+      const foto: Photo = await Camera.getPhoto({
+        quality: 60,
+        allowEditing: false,
+        resultType: CameraResultType.DataUrl,
+        source: CameraSource.Camera,
+        saveToGallery: false,
+        correctOrientation: true,
+        width: 600,
+      });
 
-    const dataUrl = `data:image/${foto.format};base64,${foto.base64String}`;
-    const rutaPersistente = await this.guardarFotoPersistente(foto);
+      if (foto?.dataUrl) {
+        let rutaPersistente: string | undefined;
+        if (Capacitor.isNativePlatform() && foto.base64String) {
+          rutaPersistente = await this.guardarFotoPersistente(foto);
+        }
+        return {
+          dataUrl: foto.dataUrl,
+          rutaPersistente,
+        };
+      }
 
-    return { dataUrl, rutaPersistente };
+      return { dataUrl: '' };
+    } catch (error) {
+      console.warn('Captura de foto cancelada o no disponible en este entorno:', error);
+      return { dataUrl: '' };
+    }
   }
 
+  // ─── Selección desde Galería ────────────────────────────────────────
+
   /**
-   * Selecciona una foto desde la galería del dispositivo.
-   *
-   * @returns Promise con el dataUrl para previsualización y la ruta persistente.
+   * Selecciona una fotografía desde la galería del dispositivo.
    */
   async seleccionarDeGaleria(): Promise<ResultadoFoto> {
-    const foto: Photo = await Camera.getPhoto({
-      quality: 80,
-      allowEditing: false,
-      resultType: CameraResultType.Base64,
-      source: CameraSource.Photos,
-      correctOrientation: true,
-      width: 1024,
-    });
+    try {
+      const foto: Photo = await Camera.getPhoto({
+        quality: 60,
+        allowEditing: false,
+        resultType: CameraResultType.DataUrl,
+        source: CameraSource.Photos,
+        correctOrientation: true,
+        width: 600,
+      });
 
-    const dataUrl = `data:image/${foto.format};base64,${foto.base64String}`;
-    const rutaPersistente = await this.guardarFotoPersistente(foto);
-
-    return { dataUrl, rutaPersistente };
-  }
-
-  // ─── Gestión de permisos ─────────────────────────────────────────────
-
-  /**
-   * Verifica y solicita permisos de cámara si no están concedidos.
-   * @throws Error si los permisos son denegados permanentemente.
-   */
-  private async verificarPermisos(): Promise<void> {
-    const permisos = await Camera.checkPermissions();
-
-    if (permisos.camera === 'denied') {
-      throw new Error(
-        'Permiso de cámara denegado permanentemente. ' +
-        'Por favor, habilítalo en la configuración del dispositivo.',
-      );
-    }
-
-    if (permisos.camera !== 'granted') {
-      const solicitud = await Camera.requestPermissions({ permissions: ['camera'] });
-      if (solicitud.camera !== 'granted') {
-        throw new Error('Se requiere permiso de cámara para capturar fotos.');
+      if (foto?.dataUrl) {
+        let rutaPersistente: string | undefined;
+        if (Capacitor.isNativePlatform() && foto.base64String) {
+          rutaPersistente = await this.guardarFotoPersistente(foto);
+        }
+        return {
+          dataUrl: foto.dataUrl,
+          rutaPersistente,
+        };
       }
+
+      return { dataUrl: '' };
+    } catch (error) {
+      console.warn('Selección de galería cancelada o no disponible:', error);
+      return { dataUrl: '' };
     }
   }
 
-  // ─── Almacenamiento persistente ──────────────────────────────────────
+  // ─── Gestión de permisos ───────────────────────────────────────────
 
-  /**
-   * Guarda la foto capturada de forma persistente en el Filesystem de Capacitor.
-   * Usa Directory.Data para asegurar que los archivos no se borren con la caché.
-   *
-   * @param foto Objeto Photo de Capacitor con base64String.
-   * @returns Ruta relativa del archivo guardado.
-   */
+  private async verificarPermisos(): Promise<void> {
+    if (!Capacitor.isNativePlatform()) return;
+
+    try {
+      const permisos = await Camera.checkPermissions();
+      if (permisos.camera !== 'granted') {
+        await Camera.requestPermissions({ permissions: ['camera'] });
+      }
+    } catch (err) {
+      console.warn('Verificación de permisos de cámara omitida:', err);
+    }
+  }
+
+  // ─── Persistencia opcional nativa ──────────────────────────────────
+
   private async guardarFotoPersistente(foto: Photo): Promise<string> {
-    const nombreArchivo = `${this.DIRECTORIO_FOTOS}/INC_${Date.now()}.${foto.format}`;
+    const nombreArchivo = `${this.DIRECTORIO_FOTOS}/INC_${Date.now()}.${foto.format || 'jpeg'}`;
+    if (!Capacitor.isNativePlatform() || !foto.base64String) {
+      return nombreArchivo;
+    }
 
-    await Filesystem.writeFile({
-      path: nombreArchivo,
-      data: foto.base64String!,
-      directory: Directory.Data,
-      recursive: true,
-    });
+    try {
+      await Filesystem.writeFile({
+        path: nombreArchivo,
+        data: foto.base64String,
+        directory: Directory.Data,
+        recursive: true,
+      });
+    } catch (fsErr) {
+      console.warn('Filesystem no pudo persistir el archivo nativamente:', fsErr);
+    }
 
     return nombreArchivo;
-  }
-
-  /**
-   * Lee una foto persistente previamente guardada y devuelve su dataUrl.
-   * Útil para mostrar fotos almacenadas en el detalle de una incidencia.
-   *
-   * @param ruta Ruta relativa de la foto en Directory.Data.
-   * @returns dataUrl base64 para mostrar en <img>.
-   */
-  async leerFotoPersistente(ruta: string): Promise<string> {
-    const resultado = await Filesystem.readFile({
-      path: ruta,
-      directory: Directory.Data,
-    });
-
-    // Extraer la extensión del nombre del archivo para el MIME type
-    const extension = ruta.split('.').pop() ?? 'jpeg';
-    return `data:image/${extension};base64,${resultado.data}`;
-  }
-
-  /**
-   * Elimina una foto persistente del almacenamiento.
-   *
-   * @param ruta Ruta relativa de la foto en Directory.Data.
-   */
-  async eliminarFoto(ruta: string): Promise<void> {
-    try {
-      await Filesystem.deleteFile({
-        path: ruta,
-        directory: Directory.Data,
-      });
-    } catch {
-      // Si el archivo no existe, no es un error crítico
-      console.warn(`No se pudo eliminar la foto: ${ruta}`);
-    }
   }
 }

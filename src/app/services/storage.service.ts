@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { Preferences } from '@capacitor/preferences';
 
-import { BorradorFormulario, Incidencia } from '../models/incidencia.model';
+import type { BorradorFormulario, Incidencia } from '../models/incidencia.model';
 
 /**
  * Servicio de integración con @capacitor/preferences para persistencia
@@ -24,6 +24,8 @@ export class StorageService {
   /** Clave para el borrador del formulario de creación */
   private readonly KEY_BORRADOR = 'urban_borrador_formulario';
 
+  private actualizacionSeguimientoEnCola: Promise<void> = Promise.resolve();
+
   // ─── R1: Seguimiento de códigos ──────────────────────────────────────
 
   /**
@@ -39,8 +41,20 @@ export class StorageService {
 
     try {
       const parsed: unknown = JSON.parse(value);
-      return Array.isArray(parsed) ? (parsed as string[]) : [];
-    } catch {
+      if (!Array.isArray(parsed)) {
+        return [];
+      }
+
+      return [
+        ...new Set(
+          parsed
+            .filter((codigo): codigo is string => typeof codigo === 'string')
+            .map((codigo) => codigo.trim())
+            .filter(Boolean),
+        ),
+      ];
+    } catch (error) {
+      console.warn('No se pudieron recuperar los códigos de seguimiento local:', error);
       return [];
     }
   }
@@ -52,15 +66,10 @@ export class StorageService {
    * @param codigo Código de incidencia a seguir.
    */
   async agregarCodigoSeguido(codigo: string): Promise<void> {
-    const codigos = await this.obtenerCodigosSeguidos();
-
-    if (!codigos.includes(codigo)) {
-      codigos.push(codigo);
-      await Preferences.set({
-        key: this.KEY_CODIGOS_SEGUIDOS,
-        value: JSON.stringify(codigos),
-      });
-    }
+    const codigoNormalizado = this.validarCodigoSeguido(codigo);
+    await this.actualizarCodigosSeguidos((codigos) =>
+      codigos.includes(codigoNormalizado) ? codigos : [...codigos, codigoNormalizado],
+    );
   }
 
   /**
@@ -69,13 +78,10 @@ export class StorageService {
    * @param codigo Código de incidencia a dejar de seguir.
    */
   async eliminarCodigoSeguido(codigo: string): Promise<void> {
-    const codigos = await this.obtenerCodigosSeguidos();
-    const filtrados = codigos.filter((c) => c !== codigo);
-
-    await Preferences.set({
-      key: this.KEY_CODIGOS_SEGUIDOS,
-      value: JSON.stringify(filtrados),
-    });
+    const codigoNormalizado = this.validarCodigoSeguido(codigo);
+    await this.actualizarCodigosSeguidos((codigos) =>
+      codigos.filter((codigoGuardado) => codigoGuardado !== codigoNormalizado),
+    );
   }
 
   /**
@@ -86,7 +92,31 @@ export class StorageService {
    */
   async codigoEstaSeguido(codigo: string): Promise<boolean> {
     const codigos = await this.obtenerCodigosSeguidos();
-    return codigos.includes(codigo);
+    return codigos.includes(codigo.trim());
+  }
+
+  private validarCodigoSeguido(codigo: string): string {
+    const codigoNormalizado = codigo.trim();
+    if (!codigoNormalizado) {
+      throw new Error('El código de incidencia para seguimiento no puede estar vacío');
+    }
+    return codigoNormalizado;
+  }
+
+  private actualizarCodigosSeguidos(actualizar: (codigos: string[]) => string[]): Promise<void> {
+    const operacion = this.actualizacionSeguimientoEnCola.then(async () => {
+      const codigos = await this.obtenerCodigosSeguidos();
+      await Preferences.set({
+        key: this.KEY_CODIGOS_SEGUIDOS,
+        value: JSON.stringify(actualizar(codigos)),
+      });
+    });
+
+    this.actualizacionSeguimientoEnCola = operacion.catch((error: unknown) => {
+      console.error('Error al actualizar los códigos de seguimiento local:', error);
+    });
+
+    return operacion;
   }
 
   // ─── R8: Borradores de formularios ───────────────────────────────────
