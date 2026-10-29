@@ -1,4 +1,5 @@
 import { Component, inject } from '@angular/core';
+import { Router } from '@angular/router';
 import {
   IonTabs, IonTabBar, IonTabButton, IonIcon, IonLabel,
   IonFab, IonFabButton, ModalController,
@@ -15,7 +16,7 @@ import { RegistroModal } from '../pages/registro/registro.modal';
  *
  * R10: 3 pestañas distribuidas uniformemente:
  *  - Tab 1: Dashboard / Inicio
- *  - Tab 2: Incidencias (listado)
+ *  - Tab 2: Incidencias (listado general)
  *  - Tab 3: Seguimiento Local
  *
  * Incluye un FAB global para acceso rápido al formulario de registro (R5).
@@ -31,6 +32,7 @@ import { RegistroModal } from '../pages/registro/registro.modal';
 })
 export class TabsPage {
   private readonly modalCtrl = inject(ModalController);
+  private readonly router = inject(Router);
 
   constructor() {
     addIcons({ homeOutline, listOutline, bookmarkOutline, addOutline });
@@ -38,6 +40,7 @@ export class TabsPage {
 
   /**
    * Abre el modal de registro de nueva incidencia (R5, R6, R7, R8).
+   * Al completarse con éxito, navega automáticamente a la pestaña de Incidencias.
    */
   async abrirRegistro(): Promise<void> {
     const modal = await this.modalCtrl.create({
@@ -51,9 +54,9 @@ export class TabsPage {
 
     const { data, role } = await modal.onWillDismiss();
     if (role === 'confirm' && data) {
-      // La incidencia fue creada exitosamente.
-      // Las tabs se refrescarán al entrar en cada vista (ionViewWillEnter).
-      console.log('Incidencia creada:', data.codigo);
+      console.log('Incidencia guardada con éxito en MockAPI:', data.codigo);
+      // Navegar a la pestaña de Incidencias (Tab 2) para visualizarla inmediatamente
+      this.router.navigate(['/tabs/tab2']);
     }
   }
 }

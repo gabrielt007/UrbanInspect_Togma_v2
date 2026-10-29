@@ -5,7 +5,7 @@ import {
   IonHeader, IonToolbar, IonTitle, IonContent,
   IonList, IonItem, IonLabel, IonBadge, IonIcon,
   IonSpinner, IonItemSliding, IonItemOptions, IonItemOption,
-  IonRefresher, IonRefresherContent, IonNote,
+  IonRefresher, IonRefresherContent,
 } from '@ionic/angular';
 import { addIcons } from 'ionicons';
 import {
@@ -34,7 +34,7 @@ import { Incidencia } from '../models/incidencia.model';
     IonHeader, IonToolbar, IonTitle, IonContent,
     IonList, IonItem, IonLabel, IonBadge, IonIcon,
     IonSpinner, IonItemSliding, IonItemOptions, IonItemOption,
-    IonRefresher, IonRefresherContent, IonNote,
+    IonRefresher, IonRefresherContent,
   ],
 })
 export class Tab3Page {
@@ -54,7 +54,7 @@ export class Tab3Page {
 
   /**
    * Hook del ciclo de vida de Ionic: se ejecuta cada vez que la vista
-   * entra en pantalla (no solo la primera vez). Ideal para refrescar datos.
+   * entra en pantalla para mantener actualizada la lista local.
    */
   ionViewWillEnter(): void {
     this.cargarIncidenciasSeguidas();
@@ -75,7 +75,6 @@ export class Tab3Page {
         return;
       }
 
-      // Resolver cada código contra el API
       const resultados: Incidencia[] = [];
       let completados = 0;
 
@@ -106,9 +105,6 @@ export class Tab3Page {
     }
   }
 
-  /**
-   * Elimina una incidencia del seguimiento local (slide-to-delete).
-   */
   async dejarDeSeguir(incidencia: Incidencia): Promise<void> {
     await this.storageService.eliminarCodigoSeguido(incidencia.codigo);
     this.incidenciasSeguidas = this.incidenciasSeguidas.filter(
@@ -116,24 +112,15 @@ export class Tab3Page {
     );
   }
 
-  /**
-   * Navega al detalle de una incidencia.
-   */
   verDetalle(incidencia: Incidencia): void {
     this.router.navigate(['/tabs/tab2/detalle', incidencia.id]);
   }
 
-  /**
-   * Pull-to-refresh.
-   */
   async refrescar(event: CustomEvent): Promise<void> {
     await this.cargarIncidenciasSeguidas();
     (event.target as HTMLIonRefresherElement).complete();
   }
 
-  /**
-   * Retorna el color del badge según el estado.
-   */
   colorEstado(estado: string): string {
     const colores: Record<string, string> = {
       pendiente: 'warning',

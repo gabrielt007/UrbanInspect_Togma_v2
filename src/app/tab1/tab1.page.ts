@@ -3,7 +3,7 @@ import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import {
   IonHeader, IonToolbar, IonTitle, IonContent,
-  IonCard, IonCardHeader, IonCardTitle, IonCardSubtitle, IonCardContent,
+  IonCard, IonCardHeader, IonCardTitle, IonCardSubtitle,
   IonGrid, IonRow, IonCol, IonIcon, IonBadge, IonSpinner,
   IonList, IonItem, IonLabel, IonChip, IonRefresher, IonRefresherContent,
 } from '@ionic/angular';
@@ -24,7 +24,7 @@ import { Incidencia } from '../models/incidencia.model';
  * Pantalla principal con:
  *  - Indicadores rápidos (total, pendientes, en proceso, resueltas)
  *  - Cantidad de incidencias seguidas localmente
- *  - Últimas 5 incidencias registradas como acceso directo
+ *  - Últimas incidencias registradas como acceso directo
  */
 @Component({
   selector: 'app-tab1',
@@ -33,7 +33,7 @@ import { Incidencia } from '../models/incidencia.model';
   imports: [
     CommonModule, RouterLink,
     IonHeader, IonToolbar, IonTitle, IonContent,
-    IonCard, IonCardHeader, IonCardTitle, IonCardSubtitle, IonCardContent,
+    IonCard, IonCardHeader, IonCardTitle, IonCardSubtitle,
     IonGrid, IonRow, IonCol, IonIcon, IonBadge, IonSpinner,
     IonList, IonItem, IonLabel, IonChip, IonRefresher, IonRefresherContent,
   ],
@@ -67,21 +67,21 @@ export class Tab1Page implements OnInit {
     this.cargarDashboard();
   }
 
+  ionViewWillEnter(): void {
+    this.cargarDashboard();
+  }
+
   /**
    * Carga todos los datos del dashboard.
    */
   async cargarDashboard(): Promise<void> {
-    this.cargando = true;
-
     try {
-      // Cargar incidencias y códigos seguidos en paralelo
       const [codigos] = await Promise.all([
         this.storageService.obtenerCodigosSeguidos(),
       ]);
 
       this.codigosSeguidos = codigos.length;
 
-      // Cargar primera página de incidencias para estadísticas
       this.incidenciasService.obtenerIncidencias(1, 50).subscribe({
         next: (incidencias) => {
           this.calcularEstadisticas(incidencias);
@@ -97,17 +97,11 @@ export class Tab1Page implements OnInit {
     }
   }
 
-  /**
-   * Pull-to-refresh handler.
-   */
   async refrescar(event: CustomEvent): Promise<void> {
     await this.cargarDashboard();
     (event.target as HTMLIonRefresherElement).complete();
   }
 
-  /**
-   * Calcula estadísticas a partir de la lista de incidencias.
-   */
   private calcularEstadisticas(incidencias: Incidencia[]): void {
     this.totalIncidencias = incidencias.length;
     this.pendientes = incidencias.filter((i) => i.estado === 'pendiente').length;
@@ -115,9 +109,6 @@ export class Tab1Page implements OnInit {
     this.resueltas = incidencias.filter((i) => i.estado === 'resuelta').length;
   }
 
-  /**
-   * Retorna la clase CSS del badge según el estado.
-   */
   colorEstado(estado: string): string {
     const colores: Record<string, string> = {
       pendiente: 'warning',

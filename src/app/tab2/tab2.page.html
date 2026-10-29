@@ -1,10 +1,10 @@
 <ion-header [translucent]="true">
   <ion-toolbar color="primary">
-    <ion-title>Incidencias</ion-title>
+    <ion-title>Listado de Incidencias</ion-title>
   </ion-toolbar>
   <ion-toolbar>
     <ion-searchbar
-      placeholder="Buscar por código..."
+      placeholder="Buscar por código (ej: INC-...)"
       [debounce]="400"
       (ionInput)="buscar($any($event))"
       animated="true"
@@ -16,7 +16,7 @@
 
 <ion-content [fullscreen]="true">
   <ion-refresher slot="fixed" (ionRefresh)="refrescar($any($event))">
-    <ion-refresher-content pullingText="Tirar para actualizar" refreshingSpinner="circles">
+    <ion-refresher-content pullingText="Deslizar para actualizar" refreshingSpinner="circles">
     </ion-refresher-content>
   </ion-refresher>
 
@@ -24,7 +24,7 @@
   @if (cargandoInicial) {
     <div class="loading-container">
       <ion-spinner name="crescent"></ion-spinner>
-      <p>Cargando incidencias...</p>
+      <p>Cargando incidencias de MockAPI...</p>
     </div>
   }
 
@@ -37,8 +37,8 @@
           <h3>Sin resultados</h3>
           <p>No se encontraron incidencias con el código "{{ terminoBusqueda }}"</p>
         } @else {
-          <h3>Sin incidencias</h3>
-          <p>No hay incidencias registradas aún</p>
+          <h3>Sin incidencias registradas</h3>
+          <p>Crea una nueva incidencia con el botón (+) para comenzar.</p>
         }
       </div>
     }
@@ -46,27 +46,37 @@
     <!-- Listado de incidencias -->
     @if (incidencias.length > 0) {
       <ion-list lines="full">
-        @for (incidencia of incidencias; track incidencia.id) {
+        @for (incidencia of incidencias; track (incidencia.id || incidencia.codigo)) {
           <ion-item button (click)="verDetalle(incidencia)" detail="true" class="incidencia-item">
             <ion-icon
               slot="start"
-              name="alert-circle-outline"
+              [name]="iconoCategoria(incidencia.tipo || incidencia.categoria)"
               [color]="colorEstado(incidencia.estado)"
               class="item-icon"
               aria-hidden="true">
             </ion-icon>
             <ion-label>
-              <h2 class="item-titulo">{{ incidencia.titulo }}</h2>
+              <h2 class="item-titulo">{{ incidencia.titulo || ((incidencia.tipo || 'Incidencia') | uppercase) }}</h2>
               <h3 class="item-codigo">{{ incidencia.codigo }}</h3>
+              
+              @if (incidencia.direccion || incidencia.sector) {
+                <p class="item-ubicacion-text">
+                  📍 {{ incidencia.direccion }} {{ incidencia.sector ? '(' + incidencia.sector + ')' : '' }}
+                </p>
+              }
+
               <p class="item-meta">
                 <ion-chip [color]="colorEstado(incidencia.estado)" class="chip-estado">
                   {{ incidencia.estado === 'en_proceso' ? 'En proceso' : (incidencia.estado | titlecase) }}
                 </ion-chip>
-                <span class="chip-categoria">{{ incidencia.categoria | titlecase }}</span>
+                <ion-chip [color]="colorPrioridad(incidencia.prioridad)" class="chip-prioridad">
+                  {{ (incidencia.prioridad || 'media') | uppercase }}
+                </ion-chip>
+                <span class="chip-categoria">{{ (incidencia.tipo || incidencia.categoria) | uppercase }}</span>
               </p>
             </ion-label>
             <ion-note slot="end" class="item-fecha">
-              {{ incidencia.fechaCreacion | date:'dd/MM/yy' }}
+              {{ (incidencia.fecha || incidencia.fechaCreacion) | date:'dd/MM/yy' }}
             </ion-note>
           </ion-item>
         }
@@ -76,7 +86,7 @@
       <ion-infinite-scroll
         [disabled]="!hayMasPaginas"
         (ionInfinite)="cargarMas($any($event))">
-        <ion-infinite-scroll-content loadingSpinner="bubbles" loadingText="Cargando más...">
+        <ion-infinite-scroll-content loadingSpinner="bubbles" loadingText="Cargando más incidencias...">
         </ion-infinite-scroll-content>
       </ion-infinite-scroll>
     }

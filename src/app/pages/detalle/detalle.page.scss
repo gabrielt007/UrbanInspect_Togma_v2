@@ -58,10 +58,29 @@
     border-radius: 8px;
   }
 
-  .categoria-chip {
-    margin-left: 8px;
+  .categoria-chip, .prioridad-chip {
+    margin-left: 6px;
     height: 26px;
-    font-size: 0.8rem;
+    font-size: 0.78rem;
+  }
+}
+
+.descripcion-texto {
+  font-size: 0.95rem;
+  line-height: 1.4;
+  color: var(--ion-color-dark);
+  margin-top: 0;
+}
+
+.direccion-info {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid var(--ion-color-light-shade);
+
+  p {
+    font-size: 0.85rem;
+    margin: 4px 0;
+    color: var(--ion-color-medium-shade);
   }
 }
 
@@ -133,4 +152,3 @@
     }
   }
 }
-

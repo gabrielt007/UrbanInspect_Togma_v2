@@ -6,8 +6,11 @@
 /** Estados posibles de una incidencia */
 export type EstadoIncidencia = 'pendiente' | 'en_proceso' | 'resuelta';
 
-/** Categorías de incidencia soportadas */
+/** Categorías o tipos de incidencia soportadas */
 export type CategoriaIncidencia = 'bache' | 'alumbrado' | 'basura' | 'señalización' | 'otro';
+
+/** Niveles de prioridad */
+export type PrioridadIncidencia = 'alta' | 'media' | 'baja';
 
 /** Coordenadas geográficas */
 export interface Coordenadas {
@@ -30,19 +33,25 @@ export interface CambioEstado {
   fecha: string;              // ISO 8601
 }
 
-/** Modelo principal de incidencia (alineado con MockAPI) */
+/** Modelo principal de incidencia (alineado con MockAPI y requerimientos R2, R3, R5, R9) */
 export interface Incidencia {
   id?: string;
-  codigo: string;
-  titulo: string;
-  descripcion: string;
-  categoria: CategoriaIncidencia;
-  estado: EstadoIncidencia;
-  coordenadas: Coordenadas;
-  foto?: string;              // base64 data URI o ruta persistente
-  clima?: DatosClima;
-  cambiosEstado?: CambioEstado[];
+  codigo: string;             // Generado automáticamente (INC-XXXX)
+  tipo: string;               // Tipo de incidencia ('bache', 'alumbrado', etc.)
+  categoria?: CategoriaIncidencia; // Alias compatible
+  titulo?: string;            // Título descriptivo
+  descripcion: string;        // Descripción del problema
+  direccion?: string;         // Dirección física o referencia
+  sector?: string;            // Sector / Barrio
+  fecha?: string;             // Fecha actual ISO
   fechaCreacion: string;      // ISO 8601
+  estado: EstadoIncidencia;   // 'pendiente' por defecto
+  prioridad?: PrioridadIncidencia; // 'alta' | 'media' | 'baja'
+  fotografia?: string;        // Base64 data URI o URL
+  foto?: string;              // Alias compatible
+  coordenadas?: Coordenadas;  // Ubicación GPS o manual
+  clima?: DatosClima;         // Condiciones climáticas de OpenWeatherMap
+  cambiosEstado?: CambioEstado[]; // Historial de transiciones
   fechaActualizacion?: string;
 }
 
@@ -65,4 +74,3 @@ export interface BorradorFormulario {
   datos: Partial<Incidencia>;
   timestamp: number;
 }
-

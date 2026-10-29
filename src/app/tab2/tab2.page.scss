@@ -56,22 +56,34 @@
     font-family: monospace;
   }
 
+  .item-ubicacion-text {
+    font-size: 0.8rem;
+    color: var(--ion-color-dark);
+    margin: 3px 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
   .item-meta {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
     margin-top: 4px;
+    flex-wrap: wrap;
   }
 
-  .chip-estado {
-    height: 22px;
-    font-size: 0.7rem;
+  .chip-estado, .chip-prioridad {
+    height: 20px;
+    font-size: 0.68rem;
     --padding-start: 6px;
     --padding-end: 6px;
+    margin: 0;
   }
 
   .chip-categoria {
-    font-size: 0.75rem;
+    font-size: 0.72rem;
+    font-weight: 600;
     color: var(--ion-color-medium-shade);
   }
 
@@ -81,4 +93,3 @@
     margin-top: 12px;
   }
 }
-

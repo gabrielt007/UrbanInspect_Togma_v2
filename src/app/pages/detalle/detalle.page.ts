@@ -7,8 +7,7 @@ import {
   IonCard, IonCardHeader, IonCardTitle, IonCardSubtitle, IonCardContent,
   IonIcon, IonBadge, IonSpinner, IonButton,
   IonList, IonItem, IonLabel, IonSelect, IonSelectOption, IonTextarea,
-  IonChip, IonImg, IonNote, IonGrid, IonRow, IonCol,
-  IonAccordionGroup, IonAccordion,
+  IonChip, IonImg, IonNote,
 } from '@ionic/angular';
 import { addIcons } from 'ionicons';
 import {
@@ -41,8 +40,7 @@ import { Incidencia, EstadoIncidencia } from '../../models/incidencia.model';
     IonCard, IonCardHeader, IonCardTitle, IonCardSubtitle, IonCardContent,
     IonIcon, IonBadge, IonSpinner, IonButton,
     IonList, IonItem, IonLabel, IonSelect, IonSelectOption, IonTextarea,
-    IonChip, IonImg, IonNote, IonGrid, IonRow, IonCol,
-    IonAccordionGroup, IonAccordion,
+    IonChip, IonImg, IonNote,
   ],
 })
 export class DetallePage implements OnInit {
@@ -139,9 +137,6 @@ export class DetallePage implements OnInit {
     this.estaSeguida = !this.estaSeguida;
   }
 
-  /**
-   * Retorna el color del badge según el estado.
-   */
   colorEstado(estado: string): string {
     const colores: Record<string, string> = {
       pendiente: 'warning',
@@ -151,9 +146,15 @@ export class DetallePage implements OnInit {
     return colores[estado] ?? 'medium';
   }
 
-  /**
-   * Verifica si el formulario de cambio de estado es válido.
-   */
+  colorPrioridad(prioridad?: string): string {
+    const colores: Record<string, string> = {
+      alta: 'danger',
+      media: 'warning',
+      baja: 'medium',
+    };
+    return colores[prioridad ?? 'media'] ?? 'medium';
+  }
+
   formularioValido(): boolean {
     return (
       !!this.incidencia &&
@@ -162,4 +163,3 @@ export class DetallePage implements OnInit {
     );
   }
 }
-

@@ -14,7 +14,7 @@
         @if (guardando) {
           <ion-spinner name="crescent" class="btn-spinner"></ion-spinner>
         } @else {
-          Guardar
+          GUARDAR
         }
       </ion-button>
     </ion-buttons>
@@ -22,50 +22,79 @@
 </ion-header>
 
 <ion-content class="ion-padding">
-  <!-- Aviso de borrador recuperado -->
+  <!-- Aviso de borrador recuperado (R8) -->
   @if (borradorRecuperado) {
     <ion-chip color="tertiary" class="borrador-chip">
       <ion-icon name="save-outline"></ion-icon>
-      <ion-label>Borrador recuperado</ion-label>
+      <ion-label>Borrador recuperado automáticamente</ion-label>
     </ion-chip>
   }
 
   <ion-list lines="full">
-    <!-- Título -->
-    <ion-item>
-      <ion-input
-        label="Título *"
-        labelPlacement="stacked"
-        placeholder="Ej: Bache en Av. Amazonas"
-        [(ngModel)]="titulo"
-        (ionBlur)="guardarBorrador()"
-        [maxlength]="100"
-        counter="true"
-        required>
-      </ion-input>
-    </ion-item>
-
-    <!-- Categoría -->
+    <!-- Tipo de Incidencia (Obligatorio) -->
     <ion-item>
       <ion-select
-        label="Categoría *"
+        label="Tipo de Incidencia *"
         labelPlacement="stacked"
-        [(ngModel)]="categoria"
+        [(ngModel)]="tipo"
+        (ionChange)="guardarBorrador()"
         interface="popover">
         @for (cat of categorias; track cat) {
           <ion-select-option [value]="cat">
-            {{ cat | titlecase }}
+            {{ cat | uppercase }}
           </ion-select-option>
         }
       </ion-select>
     </ion-item>
 
-    <!-- Descripción -->
+    <!-- Prioridad (Obligatorio) -->
+    <ion-item>
+      <ion-select
+        label="Prioridad *"
+        labelPlacement="stacked"
+        [(ngModel)]="prioridad"
+        (ionChange)="guardarBorrador()"
+        interface="popover">
+        @for (prio of prioridades; track prio) {
+          <ion-select-option [value]="prio">
+            {{ prio | uppercase }}
+          </ion-select-option>
+        }
+      </ion-select>
+    </ion-item>
+
+    <!-- Dirección (Obligatorio) -->
+    <ion-item>
+      <ion-input
+        label="Dirección *"
+        labelPlacement="stacked"
+        placeholder="Ej: Av. 10 de Agosto y Mariana de Jesús"
+        [(ngModel)]="direccion"
+        (ionBlur)="guardarBorrador()"
+        [maxlength]="120"
+        required>
+      </ion-input>
+    </ion-item>
+
+    <!-- Sector (Obligatorio) -->
+    <ion-item>
+      <ion-input
+        label="Sector / Barrio *"
+        labelPlacement="stacked"
+        placeholder="Ej: Norte - La Floresta"
+        [(ngModel)]="sector"
+        (ionBlur)="guardarBorrador()"
+        [maxlength]="80"
+        required>
+      </ion-input>
+    </ion-item>
+
+    <!-- Descripción (Obligatorio) -->
     <ion-item>
       <ion-textarea
-        label="Descripción *"
+        label="Descripción de la Incidencia *"
         labelPlacement="stacked"
-        placeholder="Describe la incidencia con detalle..."
+        placeholder="Detalla la situación encontrada en campo..."
         [(ngModel)]="descripcion"
         (ionBlur)="guardarBorrador()"
         [autoGrow]="true"
@@ -77,15 +106,15 @@
     </ion-item>
   </ion-list>
 
-  <!-- R6: Sección de foto -->
+  <!-- R6: Fotografía -->
   <div class="section-title">
     <ion-icon name="camera-outline" aria-hidden="true"></ion-icon>
-    Foto de evidencia
+    Fotografía de Inspección
   </div>
 
   @if (fotoPreview) {
     <div class="foto-container">
-      <ion-img [src]="fotoPreview" alt="Vista previa" class="foto-preview"></ion-img>
+      <ion-img [src]="fotoPreview" alt="Evidencia capturada" class="foto-preview"></ion-img>
       <ion-button fill="clear" color="danger" size="small" (click)="eliminarFoto()">
         <ion-icon name="close-outline" slot="start"></ion-icon>
         Eliminar foto
@@ -110,95 +139,134 @@
     </ion-grid>
   }
 
-  <!-- R7: Sección de ubicación -->
+  <!-- R7: Ubicación y GPS -->
   <div class="section-title">
     <ion-icon name="location-outline" aria-hidden="true"></ion-icon>
-    Ubicación *
-    @if (categoria === 'bache') {
-      <ion-note color="danger" class="obligatorio-note">(Obligatorio para baches)</ion-note>
+    Ubicación
+    @if (tipo === 'bache') {
+      <ion-note color="danger" class="obligatorio-note">*(Obligatorio para baches)</ion-note>
+    } @else {
+      <ion-note color="medium" class="opcional-note">(Opcional)</ion-note>
     }
   </div>
 
+  <!-- Chip de coordenadas activas -->
   @if (coordenadas) {
     <ion-chip color="success" class="coords-chip">
-      <ion-icon name="location-outline"></ion-icon>
-      <ion-label>{{ coordenadas.latitud.toFixed(6) }}, {{ coordenadas.longitud.toFixed(6) }}</ion-label>
+      <ion-icon name="checkmark-circle-outline"></ion-icon>
+      <ion-label>Lat: {{ coordenadas.latitud }}, Lon: {{ coordenadas.longitud }}</ion-label>
     </ion-chip>
   }
 
-  <ion-grid>
-    <ion-row>
-      <ion-col size="12">
-        <ion-button
-          expand="block"
-          fill="outline"
-          (click)="obtenerUbicacion()"
-          [disabled]="obteniendoGps">
-          @if (obteniendoGps) {
-            <ion-spinner name="crescent" class="btn-spinner"></ion-spinner>
-          } @else {
-            <ion-icon name="location-outline" slot="start"></ion-icon>
-            Obtener GPS actual
-          }
-        </ion-button>
-      </ion-col>
-    </ion-row>
-  </ion-grid>
+  <!-- Botón GPS -->
+  <ion-button
+    expand="block"
+    fill="outline"
+    (click)="obtenerUbicacion()"
+    [disabled]="obteniendoGps"
+    class="btn-gps">
+    @if (obteniendoGps) {
+      <ion-spinner name="crescent" class="btn-spinner"></ion-spinner>
+      <span style="margin-left: 8px;">Obteniendo coordenadas GPS...</span>
+    } @else {
+      <ion-icon name="location-outline" slot="start"></ion-icon>
+      Obtener GPS Actual
+    }
+  </ion-button>
 
-  <!-- Modo manual (fallback) -->
-  @if (modoManual) {
-    <ion-note color="warning" class="manual-note">
-      No se pudo obtener el GPS. Ingresa las coordenadas manualmente:
-    </ion-note>
-    <ion-list lines="full">
-      <ion-item>
-        <ion-input
-          label="Latitud"
-          labelPlacement="stacked"
-          type="number"
-          placeholder="Ej: -0.1807"
-          [(ngModel)]="latManual"
-          [step]="0.000001">
-        </ion-input>
-      </ion-item>
-      <ion-item>
-        <ion-input
-          label="Longitud"
-          labelPlacement="stacked"
-          type="number"
-          placeholder="Ej: -78.4678"
-          [(ngModel)]="lonManual"
-          [step]="0.000001">
-        </ion-input>
-      </ion-item>
-    </ion-list>
-    <ion-button expand="block" fill="outline" (click)="aplicarCoordenadasManuales()" class="btn-aplicar">
-      Aplicar coordenadas
-    </ion-button>
+  <!-- Mensaje de aviso cuando el GPS falla -->
+  @if (mensajeGpsError) {
+    <div class="gps-error-banner">
+      <ion-icon name="warning-outline" color="warning"></ion-icon>
+      <p>{{ mensajeGpsError }}</p>
+    </div>
   }
 
-  <!-- R4: Datos de clima -->
+  <!-- Botón / Campos de ingreso manual de coordenadas (R7) -->
+  @if (modoManual || !coordenadas) {
+    <div class="manual-section">
+      <ion-note color="dark" class="manual-title">
+        Ingreso manual de coordenadas (Latitud y Longitud):
+      </ion-note>
+      <ion-list lines="full">
+        <ion-item>
+          <ion-input
+            label="Latitud (-90 a 90)"
+            labelPlacement="stacked"
+            type="number"
+            placeholder="Ej: -0.180653"
+            [(ngModel)]="latManual"
+            (ionInput)="onCoordenadasManualesChange()"
+            (ionBlur)="onCoordenadasManualesChange()"
+            [step]="0.000001">
+          </ion-input>
+        </ion-item>
+        <ion-item>
+          <ion-input
+            label="Longitud (-180 a 180)"
+            labelPlacement="stacked"
+            type="number"
+            placeholder="Ej: -78.467834"
+            [(ngModel)]="lonManual"
+            (ionInput)="onCoordenadasManualesChange()"
+            (ionBlur)="onCoordenadasManualesChange()"
+            [step]="0.000001">
+          </ion-input>
+        </ion-item>
+      </ion-list>
+      <ion-button
+        expand="block"
+        fill="clear"
+        size="small"
+        (click)="aplicarCoordenadasManuales()"
+        class="btn-aplicar">
+        Aplicar y consultar clima
+      </ion-button>
+    </div>
+  }
+
+  <!-- R4: Datos de OpenWeatherMap -->
   @if (obteniendoClima) {
     <div class="clima-loading">
       <ion-spinner name="dots" class="clima-spinner"></ion-spinner>
-      <span>Consultando clima...</span>
+      <span>Consultando API de OpenWeatherMap...</span>
+    </div>
+  }
+
+  @if (errorClima) {
+    <div class="clima-aviso-info">
+      <ion-icon name="information-circle-outline" color="medium"></ion-icon>
+      <p>{{ errorClima }}</p>
     </div>
   }
 
   @if (clima) {
     <div class="section-title">
       <ion-icon name="cloud-outline" aria-hidden="true"></ion-icon>
-      Condiciones climáticas
+      Condiciones Meteorológicas (OpenWeatherMap)
     </div>
+
+    <!-- Advertencia visual no bloqueante si lluvia > 5 mm -->
+    @if (clima.precipitacionMm > 5) {
+      <div class="advertencia-lluvia">
+        <ion-icon name="warning-outline" color="warning"></ion-icon>
+        <div>
+          <strong>Alerta de Lluvia Intensa:</strong>
+          <p>Precipitación registrada de {{ clima.precipitacionMm }} mm en la última hora (> 5 mm). Precaución en inspecciones de campo.</p>
+        </div>
+      </div>
+    }
+
+    <!-- Panel de datos meteorológicos -->
     <ion-grid class="clima-grid">
       <ion-row>
         <ion-col size="4" class="clima-stat">
           <strong>{{ clima.temperatura }}°C</strong>
-          <span>Temp.</span>
+          <span>Temperatura</span>
         </ion-col>
         <ion-col size="4" class="clima-stat">
-          <strong>{{ clima.precipitacionMm }} mm</strong>
-          <span>Lluvia</span>
+          <strong [class.lluvia-alta]="clima.precipitacionMm > 5">{{ clima.precipitacionMm }} mm</strong>
+          <span>Lluvia (1h)</span>
         </ion-col>
         <ion-col size="4" class="clima-stat">
           <strong>{{ clima.descripcion | titlecase }}</strong>
@@ -208,4 +276,3 @@
     </ion-grid>
   }
 </ion-content>
-

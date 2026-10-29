@@ -1,9 +1,10 @@
-import { Component, inject, OnInit, ViewChild } from '@angular/core';
+import { Component, inject, OnInit, OnDestroy, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
+import { Subscription } from 'rxjs';
 import {
   IonHeader, IonToolbar, IonTitle, IonContent,
-  IonList, IonItem, IonLabel, IonBadge, IonIcon,
+  IonList, IonItem, IonLabel, IonIcon,
   IonSpinner, IonSearchbar, IonRefresher, IonRefresherContent,
   IonInfiniteScroll, IonInfiniteScrollContent,
   IonNote, IonChip,
@@ -11,6 +12,7 @@ import {
 import { addIcons } from 'ionicons';
 import {
   alertCircleOutline, searchOutline, documentTextOutline,
+  warningOutline, bulbOutline, trashOutline, trailSignOutline, helpCircleOutline,
 } from 'ionicons/icons';
 
 import { IncidenciasService } from '../services/incidencias.service';
@@ -21,6 +23,7 @@ import { Incidencia } from '../models/incidencia.model';
  *
  * Implementa:
  *  - R3: Carga progresiva / paginación incremental mediante infinite scroll.
+ *  - R2, R5: Sincronización automática de nuevos registros creados desde el formulario.
  *  - Navegación al detalle al tocar un elemento (→ R9).
  *  - Búsqueda por código.
  */
@@ -31,13 +34,13 @@ import { Incidencia } from '../models/incidencia.model';
   imports: [
     CommonModule,
     IonHeader, IonToolbar, IonTitle, IonContent,
-    IonList, IonItem, IonLabel, IonBadge, IonIcon,
+    IonList, IonItem, IonLabel, IonIcon,
     IonSpinner, IonSearchbar, IonRefresher, IonRefresherContent,
     IonInfiniteScroll, IonInfiniteScrollContent,
     IonNote, IonChip,
   ],
 })
-export class Tab2Page implements OnInit {
+export class Tab2Page implements OnInit, OnDestroy {
   private readonly incidenciasService = inject(IncidenciasService);
   private readonly router = inject(Router);
 
@@ -57,16 +60,45 @@ export class Tab2Page implements OnInit {
   /** Búsqueda */
   terminoBusqueda = '';
 
+  /** Suscripción a creación reactiva de incidencias */
+  private subscripcionCreacion?: Subscription;
+
   constructor() {
-    addIcons({ alertCircleOutline, searchOutline, documentTextOutline });
+    addIcons({
+      alertCircleOutline, searchOutline, documentTextOutline,
+      warningOutline, bulbOutline, trashOutline, trailSignOutline, helpCircleOutline,
+    });
   }
 
   ngOnInit(): void {
     this.cargarIncidencias();
+
+    // Sincronización automática: al guardar con éxito en MockAPI, el nuevo registro
+    // aparece reflejado inmediatamente al inicio de la lista local.
+    this.subscripcionCreacion = this.incidenciasService.incidenciaCreada$.subscribe((nueva) => {
+      this.terminoBusqueda = '';
+      this.incidencias = [
+        nueva,
+        ...this.incidencias.filter((item) => item.codigo !== nueva.codigo && item.id !== nueva.id),
+      ];
+    });
+  }
+
+  ngOnDestroy(): void {
+    this.subscripcionCreacion?.unsubscribe();
   }
 
   /**
-   * Carga la primera página de incidencias.
+   * Ciclo de vida Ionic: asegura que los datos estén cargados al entrar a la tab.
+   */
+  ionViewWillEnter(): void {
+    if (this.incidencias.length === 0 && !this.cargandoInicial) {
+      this.cargarIncidencias();
+    }
+  }
+
+  /**
+   * Carga la primera página de incidencias desde MockAPI.
    */
   cargarIncidencias(): void {
     this.cargandoInicial = true;
@@ -113,7 +145,7 @@ export class Tab2Page implements OnInit {
   }
 
   /**
-   * Pull-to-refresh: recarga desde la primera página.
+   * Pull-to-refresh: recarga desde la primera página desde el servidor.
    */
   refrescar(event: CustomEvent): void {
     this.terminoBusqueda = '';
@@ -128,7 +160,6 @@ export class Tab2Page implements OnInit {
           this.hayMasPaginas = data.length === this.ITEMS_POR_PAGINA;
           (event.target as HTMLIonRefresherElement).complete();
 
-          // Re-habilitar infinite scroll tras refresh
           if (this.infiniteScroll) {
             this.infiniteScroll.disabled = false;
           }
@@ -172,9 +203,6 @@ export class Tab2Page implements OnInit {
     this.router.navigate(['/tabs/tab2/detalle', incidencia.id]);
   }
 
-  /**
-   * Retorna el color del badge según el estado.
-   */
   colorEstado(estado: string): string {
     const colores: Record<string, string> = {
       pendiente: 'warning',
@@ -184,17 +212,23 @@ export class Tab2Page implements OnInit {
     return colores[estado] ?? 'medium';
   }
 
-  /**
-   * Retorna el icono según la categoría.
-   */
-  iconoCategoria(categoria: string): string {
+  colorPrioridad(prioridad?: string): string {
+    const colores: Record<string, string> = {
+      alta: 'danger',
+      media: 'warning',
+      baja: 'medium',
+    };
+    return colores[prioridad ?? 'media'] ?? 'medium';
+  }
+
+  iconoCategoria(categoria?: string): string {
     const iconos: Record<string, string> = {
       bache: 'warning-outline',
       alumbrado: 'bulb-outline',
       basura: 'trash-outline',
-      señalización: 'sign-post-outline',
+      señalización: 'trail-sign-outline',
       otro: 'help-circle-outline',
     };
-    return iconos[categoria] ?? 'document-text-outline';
+    return iconos[categoria ?? 'otro'] ?? 'document-text-outline';
   }
 }

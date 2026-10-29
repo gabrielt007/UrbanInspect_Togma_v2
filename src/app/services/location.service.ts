@@ -4,48 +4,86 @@ import { Geolocation, Position } from '@capacitor/geolocation';
 import { Coordenadas } from '../models/incidencia.model';
 
 /**
- * Servicio de integración con @capacitor/geolocation para obtener
- * la ubicación GPS del dispositivo.
+ * Servicio de integración con geolocalización.
  *
  * Soporta:
  *  - R7: Obtención del GPS actual con fallback a coordenadas manuales
  *        (obligatorio para incidencias de tipo 'bache').
- *
- * Flujo:
- *  1. Intenta obtener la posición GPS actual.
- *  2. Si falla (permisos denegados, GPS apagado, timeout), retorna null.
- *  3. El componente consumidor puede entonces solicitar coordenadas manuales.
+ *  - Manejo de errores robusto (try/catch) compatible con entornos web y emuladores.
+ *  - Fallback a la API de Geolocation estándar del navegador si Capacitor falla.
  */
 @Injectable({ providedIn: 'root' })
 export class LocationService {
-  /** Tiempo máximo de espera para obtener la posición (ms) */
-  private readonly TIMEOUT_GPS = 15_000;
+  /** Tiempo máximo de espera para obtener la posición por GPS (ms) */
+  private readonly TIMEOUT_GPS = 8_000;
 
   // ─── Obtención de ubicación ──────────────────────────────────────────
 
   /**
-   * Obtiene la posición GPS actual del dispositivo.
-   * Solicita permisos automáticamente si no los tiene.
+   * Obtiene la posición GPS actual del dispositivo o emulador.
+   * Maneja errores exhaustivamente y retorna null si el GPS no está disponible,
+   * permitiendo al componente activar de inmediato el ingreso manual.
    *
-   * @returns Coordenadas del dispositivo o `null` si no se pudo obtener.
+   * @returns Coordenadas del dispositivo o `null` si falla.
    */
   async obtenerUbicacionActual(): Promise<Coordenadas | null> {
+    // 1. Intentar primero con Capacitor Geolocation
     try {
       await this.verificarPermisos();
 
       const posicion: Position = await Geolocation.getCurrentPosition({
         enableHighAccuracy: true,
         timeout: this.TIMEOUT_GPS,
+        maximumAge: 10_000,
       });
 
-      return {
-        latitud: posicion.coords.latitude,
-        longitud: posicion.coords.longitude,
-      };
-    } catch (error) {
-      console.warn('No se pudo obtener la ubicación GPS:', error);
-      return null;
+      if (posicion?.coords?.latitude !== undefined && posicion?.coords?.longitude !== undefined) {
+        return {
+          latitud: Number(posicion.coords.latitude.toFixed(6)),
+          longitud: Number(posicion.coords.longitude.toFixed(6)),
+        };
+      }
+    } catch (capError) {
+      console.warn('Capacitor Geolocation no disponible o falló en este entorno:', capError);
     }
+
+    // 2. Fallback robusto para navegador web y emuladores usando navigator.geolocation nativo
+    try {
+      if (typeof navigator !== 'undefined' && 'geolocation' in navigator) {
+        const coordsNativas = await new Promise<Coordenadas | null>((resolve) => {
+          navigator.geolocation.getCurrentPosition(
+            (pos) => {
+              if (pos?.coords) {
+                resolve({
+                  latitud: Number(pos.coords.latitude.toFixed(6)),
+                  longitud: Number(pos.coords.longitude.toFixed(6)),
+                });
+              } else {
+                resolve(null);
+              }
+            },
+            (err) => {
+              console.warn('navigator.geolocation fallback también falló:', err.message);
+              resolve(null);
+            },
+            {
+              enableHighAccuracy: false,
+              timeout: 6_000,
+              maximumAge: 15_000,
+            },
+          );
+        });
+
+        if (coordsNativas) {
+          return coordsNativas;
+        }
+      }
+    } catch (webError) {
+      console.warn('Error en fallback web de geolocalización:', webError);
+    }
+
+    // Si fallan ambos, retorna null de forma segura para activar el modo manual
+    return null;
   }
 
   // ─── Validación de coordenadas manuales ──────────────────────────────
@@ -59,6 +97,8 @@ export class LocationService {
    */
   validarCoordenadas(lat: number, lon: number): boolean {
     return (
+      typeof lat === 'number' &&
+      typeof lon === 'number' &&
       !isNaN(lat) &&
       !isNaN(lon) &&
       lat >= -90 &&
@@ -84,47 +124,49 @@ export class LocationService {
       );
     }
 
-    return { latitud: lat, longitud: lon };
+    return {
+      latitud: Number(lat.toFixed(6)),
+      longitud: Number(lon.toFixed(6)),
+    };
   }
 
   // ─── Gestión de permisos ─────────────────────────────────────────────
 
   /**
-   * Verifica y solicita permisos de geolocalización.
-   * @throws Error si los permisos son denegados permanentemente.
+   * Verifica y solicita permisos de geolocalización de forma segura.
+   * Atrapa excepciones para entornos que no implementan checkPermissions.
    */
   private async verificarPermisos(): Promise<void> {
-    const permisos = await Geolocation.checkPermissions();
+    try {
+      const permisos = await Geolocation.checkPermissions();
 
-    if (permisos.location === 'denied') {
-      throw new Error(
-        'Permiso de ubicación denegado permanentemente. ' +
-        'Por favor, habilítalo en la configuración del dispositivo.',
-      );
-    }
-
-    if (permisos.location !== 'granted') {
-      const solicitud = await Geolocation.requestPermissions({
-        permissions: ['location'],
-      });
-      if (solicitud.location !== 'granted') {
-        throw new Error('Se requiere permiso de ubicación para registrar incidencias.');
+      if (permisos.location === 'denied') {
+        throw new Error('Permiso de ubicación denegado en el dispositivo.');
       }
+
+      if (permisos.location !== 'granted') {
+        const solicitud = await Geolocation.requestPermissions({
+          permissions: ['location'],
+        });
+        if (solicitud.location !== 'granted') {
+          throw new Error('Permiso de ubicación no concedido por el usuario.');
+        }
+      }
+    } catch (permError) {
+      // Dejar propagar para que obtenerUbicacionActual pase al fallback web
+      throw permError;
     }
   }
 
   /**
    * Verifica si el GPS está disponible y los permisos concedidos.
-   * Útil para mostrar indicadores de estado en la UI.
-   *
-   * @returns `true` si se puede intentar obtener la ubicación.
    */
   async gpsDisponible(): Promise<boolean> {
     try {
       const permisos = await Geolocation.checkPermissions();
       return permisos.location === 'granted';
     } catch {
-      return false;
+      return typeof navigator !== 'undefined' && 'geolocation' in navigator;
     }
   }
 }

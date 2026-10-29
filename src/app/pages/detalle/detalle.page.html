@@ -3,7 +3,7 @@
     <ion-buttons slot="start">
       <ion-back-button defaultHref="/tabs/tab2" text="Volver"></ion-back-button>
     </ion-buttons>
-    <ion-title>Detalle</ion-title>
+    <ion-title>Detalle de Incidencia</ion-title>
     @if (incidencia) {
       <ion-buttons slot="end">
         <ion-button (click)="toggleSeguimiento()">
@@ -34,45 +34,57 @@
         <ion-card-subtitle>
           <span class="codigo">{{ incidencia.codigo }}</span>
         </ion-card-subtitle>
-        <ion-card-title>{{ incidencia.titulo }}</ion-card-title>
+        <ion-card-title>{{ incidencia.titulo || ((incidencia.tipo || 'Incidencia') | uppercase) }}</ion-card-title>
       </ion-card-header>
       <ion-card-content>
         <ion-badge [color]="colorEstado(incidencia.estado)" class="estado-badge">
           {{ incidencia.estado === 'en_proceso' ? 'En Proceso' : (incidencia.estado | titlecase) }}
         </ion-badge>
         <ion-chip color="medium" class="categoria-chip">
-          {{ incidencia.categoria | titlecase }}
+          {{ (incidencia.tipo || incidencia.categoria) | uppercase }}
         </ion-chip>
+        @if (incidencia.prioridad) {
+          <ion-chip [color]="colorPrioridad(incidencia.prioridad)" class="prioridad-chip">
+            Prioridad: {{ incidencia.prioridad | uppercase }}
+          </ion-chip>
+        }
       </ion-card-content>
     </ion-card>
 
-    <!-- Descripción -->
+    <!-- Descripción y ubicación física -->
     <ion-card>
       <ion-card-header>
-        <ion-card-subtitle>Descripción</ion-card-subtitle>
+        <ion-card-subtitle>Descripción y Ubicación</ion-card-subtitle>
       </ion-card-header>
       <ion-card-content>
-        {{ incidencia.descripcion }}
+        <p class="descripcion-texto">{{ incidencia.descripcion }}</p>
+        
+        @if (incidencia.direccion || incidencia.sector) {
+          <div class="direccion-info">
+            <p><strong>Dirección:</strong> {{ incidencia.direccion }}</p>
+            <p><strong>Sector:</strong> {{ incidencia.sector }}</p>
+          </div>
+        }
       </ion-card-content>
     </ion-card>
 
-    <!-- Foto -->
-    @if (incidencia.foto) {
+    <!-- Foto / Fotografía -->
+    @if (incidencia.fotografia || incidencia.foto) {
       <ion-card>
         <ion-card-header>
           <ion-card-subtitle>
             <ion-icon name="camera-outline" aria-hidden="true"></ion-icon>
-            Foto
+            Fotografía de Evidencia
           </ion-card-subtitle>
         </ion-card-header>
-        <ion-img [src]="incidencia.foto" alt="Foto de la incidencia" class="foto-incidencia"></ion-img>
+        <ion-img [src]="incidencia.fotografia || incidencia.foto" alt="Foto de la incidencia" class="foto-incidencia"></ion-img>
       </ion-card>
     }
 
-    <!-- Información adicional -->
+    <!-- Información técnica (GPS y Clima) -->
     <ion-card>
       <ion-card-header>
-        <ion-card-subtitle>Información</ion-card-subtitle>
+        <ion-card-subtitle>Datos Técnicos y Meteorológicos</ion-card-subtitle>
       </ion-card-header>
       <ion-card-content>
         <ion-list lines="none" class="info-list">
@@ -81,13 +93,13 @@
             <ion-item>
               <ion-icon slot="start" name="location-outline" color="danger" aria-hidden="true"></ion-icon>
               <ion-label>
-                <p>Ubicación</p>
+                <p>Coordenadas GPS</p>
                 <h3>{{ incidencia.coordenadas.latitud }}, {{ incidencia.coordenadas.longitud }}</h3>
               </ion-label>
             </ion-item>
           }
 
-          <!-- Clima -->
+          <!-- Clima OpenWeatherMap -->
           @if (incidencia.clima) {
             <ion-item>
               <ion-icon slot="start" name="thermometer-outline" color="tertiary" aria-hidden="true"></ion-icon>
@@ -99,14 +111,14 @@
             <ion-item>
               <ion-icon slot="start" name="rainy-outline" color="primary" aria-hidden="true"></ion-icon>
               <ion-label>
-                <p>Precipitación (última hora)</p>
+                <p>Precipitación (1h)</p>
                 <h3>{{ incidencia.clima.precipitacionMm }} mm</h3>
               </ion-label>
             </ion-item>
             <ion-item>
               <ion-icon slot="start" name="cloud-outline" color="medium" aria-hidden="true"></ion-icon>
               <ion-label>
-                <p>Condición</p>
+                <p>Condición climática</p>
                 <h3>{{ incidencia.clima.descripcion | titlecase }}</h3>
               </ion-label>
             </ion-item>
@@ -116,8 +128,8 @@
           <ion-item>
             <ion-icon slot="start" name="calendar-outline" color="secondary" aria-hidden="true"></ion-icon>
             <ion-label>
-              <p>Fecha de creación</p>
-              <h3>{{ incidencia.fechaCreacion | date:'dd/MM/yyyy HH:mm' }}</h3>
+              <p>Fecha de registro</p>
+              <h3>{{ (incidencia.fecha || incidencia.fechaCreacion) | date:'dd/MM/yyyy HH:mm' }}</h3>
             </ion-label>
           </ion-item>
           @if (incidencia.fechaActualizacion) {
@@ -138,7 +150,7 @@
       <ion-card-header>
         <ion-card-subtitle>
           <ion-icon name="swap-horizontal-outline" aria-hidden="true"></ion-icon>
-          Cambiar Estado
+          Cambiar Estado de Incidencia (R9)
         </ion-card-subtitle>
       </ion-card-header>
       <ion-card-content>
@@ -156,9 +168,9 @@
           </ion-item>
           <ion-item>
             <ion-textarea
-              label="Observación *"
+              label="Observación obligatoria *"
               labelPlacement="stacked"
-              placeholder="Describe el motivo del cambio de estado..."
+              placeholder="Justifica el cambio de estado con observaciones de campo..."
               [(ngModel)]="observacion"
               [autoGrow]="true"
               [rows]="3"
@@ -189,7 +201,7 @@
         <ion-card-header>
           <ion-card-subtitle>
             <ion-icon name="time-outline" aria-hidden="true"></ion-icon>
-            Historial de Cambios
+            Historial de Cambios de Estado
           </ion-card-subtitle>
         </ion-card-header>
         <ion-card-content>
@@ -227,4 +239,3 @@
     </div>
   }
 </ion-content>
-
