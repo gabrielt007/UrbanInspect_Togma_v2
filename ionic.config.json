@@ -1,0 +1,7 @@
+{
+  "name": "UrbanInspect_Togma_v2",
+  "integrations": {
+    "capacitor": {}
+  },
+  "type": "angular-standalone"
+}
