@@ -3,6 +3,7 @@ import { Router, type CanActivateFn, type Routes } from '@angular/router';
 import { firstValueFrom, take } from 'rxjs';
 
 import { AuthService } from '../services/auth';
+
 import { TabsPage } from './tabs.page';
 
 const requireAuthentication: CanActivateFn = async (_route, state) => {
@@ -38,6 +39,7 @@ export const routes: Routes = [
       },
       {
         path: 'tab2',
+        pathMatch: 'full',
         loadComponent: () => import('../tab2/tab2.page').then((m) => m.Tab2Page),
       },
       {

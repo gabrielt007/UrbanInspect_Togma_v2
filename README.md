@@ -82,19 +82,29 @@ Antes de ejecutar la aplicación, configura los valores de entorno indicados en 
 
 ## Configuración de entorno
 
-Los archivos `src/environments/environment.ts` y `src/environments/environment.prod.ts` leen la configuración desde el objeto global `globalThis.__URBANINSPECT_CONFIG__`. Este objeto debe estar definido **antes de que se cargue la aplicación Angular**:
+Usa `src/environments/enviroment.example.ts` como plantilla y copia sus valores a `src/environments/environment.ts` y `src/environments/environment.prod.ts`:
 
 ```ts
-globalThis.__URBANINSPECT_CONFIG__ = {
+export const environment = {
+  production: false,
+  firebase: {
+    apiKey: '<CLAVE_DE_FIREBASE>',
+    authDomain: '<ID_DEL_PROYECTO>.firebaseapp.com',
+    projectId: '<ID_DEL_PROYECTO>',
+    appId: '<ID_DE_LA_APLICACION>',
+  },
   mockApiUrl: 'https://<ID_DEL_PROYECTO>.mockapi.io/incidencias',
   openWeatherMapApiKey: '<CLAVE_DE_OPENWEATHERMAP>',
+  openWeatherMapUrl: 'https://api.openweathermap.org/data/2.5/weather',
+  cloudinaryCloudName: '<CLOUD_NAME>',
+  cloudinaryUploadPreset: '<PRESET_UNSIGNED>',
 };
 ```
 
-El repositorio no inicializa automáticamente este objeto. El entorno de desarrollo o el hosting debe inyectarlo antes del bundle de Angular; definirlo después de iniciar la aplicación no actualizará los valores ya importados.
-
 - `mockApiUrl`: URL base del recurso de incidencias de MockAPI. Debe ser una URL válida y no una ruta vacía o relativa.
 - `openWeatherMapApiKey`: clave de OpenWeatherMap. Si no está configurada, las consultas climáticas no podrán autenticarse.
+- `cloudinaryCloudName` y `cloudinaryUploadPreset`: valores del Cloudinary cloud name y de un upload preset sin firma habilitado para imágenes. Las incidencias guardan la URL segura devuelta por Cloudinary, no el Base64 de la fotografía.
+- `firebase`: configuración pública de la aplicación web de Firebase. Habilita Email/Password en Firebase Authentication para permitir el registro y el inicio de sesión.
 
 No agregues claves, credenciales ni URLs privadas a los archivos versionados. Los archivos `.env` y `src/environments/*.local.ts` están excluidos por `.gitignore`, pero Angular no carga automáticamente esos formatos en este proyecto.
 

@@ -3,16 +3,33 @@ import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
 import { Subscription, finalize } from 'rxjs';
 import {
-  IonHeader, IonToolbar, IonTitle, IonContent,
-  IonList, IonItem, IonLabel, IonIcon,
-  IonSpinner, IonSearchbar, IonRefresher, IonRefresherContent,
-  IonInfiniteScroll, IonInfiniteScrollContent,
-  IonNote, IonChip,
+  IonHeader,
+  IonToolbar,
+  IonTitle,
+  IonContent,
+  IonList,
+  IonItem,
+  IonLabel,
+  IonIcon,
+  IonSpinner,
+  IonSearchbar,
+  IonRefresher,
+  IonRefresherContent,
+  IonInfiniteScroll,
+  IonInfiniteScrollContent,
+  IonNote,
+  IonChip,
 } from '@ionic/angular';
 import { addIcons } from 'ionicons';
 import {
-  alertCircleOutline, searchOutline, documentTextOutline,
-  warningOutline, bulbOutline, trashOutline, trailSignOutline, helpCircleOutline,
+  alertCircleOutline,
+  searchOutline,
+  documentTextOutline,
+  warningOutline,
+  bulbOutline,
+  trashOutline,
+  trailSignOutline,
+  helpCircleOutline,
 } from 'ionicons/icons';
 
 import { IncidenciasService } from '../services/incidencias.service';
@@ -34,11 +51,22 @@ import { Incidencia } from '../models/incidencia.model';
   styleUrls: ['tab2.page.scss'],
   imports: [
     CommonModule,
-    IonHeader, IonToolbar, IonTitle, IonContent,
-    IonList, IonItem, IonLabel, IonIcon,
-    IonSpinner, IonSearchbar, IonRefresher, IonRefresherContent,
-    IonInfiniteScroll, IonInfiniteScrollContent,
-    IonNote, IonChip,
+    IonHeader,
+    IonToolbar,
+    IonTitle,
+    IonContent,
+    IonList,
+    IonItem,
+    IonLabel,
+    IonIcon,
+    IonSpinner,
+    IonSearchbar,
+    IonRefresher,
+    IonRefresherContent,
+    IonInfiniteScroll,
+    IonInfiniteScrollContent,
+    IonNote,
+    IonChip,
   ],
 })
 export class Tab2Page implements OnInit, OnDestroy {
@@ -67,8 +95,14 @@ export class Tab2Page implements OnInit, OnDestroy {
 
   constructor() {
     addIcons({
-      alertCircleOutline, searchOutline, documentTextOutline,
-      warningOutline, bulbOutline, trashOutline, trailSignOutline, helpCircleOutline,
+      alertCircleOutline,
+      searchOutline,
+      documentTextOutline,
+      warningOutline,
+      bulbOutline,
+      trashOutline,
+      trailSignOutline,
+      helpCircleOutline,
     });
   }
 
@@ -81,31 +115,25 @@ export class Tab2Page implements OnInit, OnDestroy {
       this.terminoBusqueda = '';
       this.cargandoInicial = false;
       const sinNueva = this.incidencias.filter(
-        (item) =>
-          (!item.id || item.id !== nueva.id) &&
-          (!item.codigo || item.codigo !== nueva.codigo),
+        (item) => (!item.id || item.id !== nueva.id) && (!item.codigo || item.codigo !== nueva.codigo),
       );
       this.incidencias = [nueva, ...sinNueva];
     });
 
     // Sincronización automática: al actualizar el estado de una incidencia en Detalle,
     // se refleja de inmediato en el elemento correspondiente del listado general.
-    this.subscripcionActualizacion = this.incidenciasService.incidenciaActualizada$.subscribe(
-      (actualizada) => {
-        const index = this.incidencias.findIndex(
-          (item) =>
-            (item.id && item.id === actualizada.id) ||
-            (item.codigo && item.codigo === actualizada.codigo),
-        );
-        if (index !== -1) {
-          this.incidencias[index] = {
-            ...this.incidencias[index],
-            ...actualizada,
-          };
-          this.incidencias = [...this.incidencias];
-        }
-      },
-    );
+    this.subscripcionActualizacion = this.incidenciasService.incidenciaActualizada$.subscribe((actualizada) => {
+      const index = this.incidencias.findIndex(
+        (item) => (item.id && item.id === actualizada.id) || (item.codigo && item.codigo === actualizada.codigo),
+      );
+      if (index !== -1) {
+        this.incidencias[index] = {
+          ...this.incidencias[index],
+          ...actualizada,
+        };
+        this.incidencias = [...this.incidencias];
+      }
+    });
   }
 
   ngOnDestroy(): void {
@@ -126,10 +154,7 @@ export class Tab2Page implements OnInit, OnDestroy {
    * Une listas de incidencias garantizando unicidad absoluta por ID y Código
    * para prevenir duplicaciones en la UI y errores de trackBy.
    */
-  private combinarSinDuplicados(
-    actuales: Incidencia[],
-    nuevas: Incidencia[],
-  ): Incidencia[] {
+  private combinarSinDuplicados(actuales: Incidencia[], nuevas: Incidencia[]): Incidencia[] {
     const mapa = new Map<string, Incidencia>();
 
     for (const item of actuales) {
@@ -218,10 +243,7 @@ export class Tab2Page implements OnInit, OnDestroy {
           const longitudDespues = this.incidencias.length;
 
           // Si no se agregaron elementos nuevos únicos o el lote fue menor al límite
-          if (
-            longitudDespues === longitudAntes ||
-            nuevas.length < this.ITEMS_POR_PAGINA
-          ) {
+          if (longitudDespues === longitudAntes || nuevas.length < this.ITEMS_POR_PAGINA) {
             this.hayMasPaginas = false;
             (event.target as HTMLIonInfiniteScrollElement).disabled = true;
           }
@@ -310,7 +332,10 @@ export class Tab2Page implements OnInit, OnDestroy {
    * Navega a la vista de detalle de una incidencia.
    */
   verDetalle(incidencia: Incidencia): void {
-    this.router.navigate(['/tabs/tab2/detalle', incidencia.id]);
+    const identificador = incidencia.id || incidencia.codigo;
+    if (identificador) {
+      void this.router.navigate(['/tabs/tab2/detalle', identificador]);
+    }
   }
 
   colorEstado(estado: string): string {

@@ -9,6 +9,15 @@
   justify-content: center;
 }
 
+.foto-subiendo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 8px 0;
+  color: var(--ion-color-medium);
+  font-size: 0.9rem;
+}
+
 .section-title {
   display: flex;
   align-items: center;

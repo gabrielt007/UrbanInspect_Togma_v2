@@ -1,23 +1,20 @@
 import { Injectable } from '@angular/core';
-import { Camera, CameraResultType, CameraSource, Photo } from '@capacitor/camera';
-import { Filesystem, Directory } from '@capacitor/filesystem';
+import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
+import type { Photo } from '@capacitor/camera';
 import { Capacitor } from '@capacitor/core';
 
-import { ResultadoFoto } from '../models/incidencia.model';
+import type { ResultadoFoto } from '../models/incidencia.model';
 
 /**
- * Servicio de integración con @capacitor/camera y @capacitor/filesystem
- * para captura, previsualización y persistencia de fotos de incidencias.
+ * Servicio de captura de imágenes que se previsualizan y suben a Cloudinary.
  */
 @Injectable({ providedIn: 'root' })
 export class CameraService {
-  private readonly DIRECTORIO_FOTOS = 'incidencias_fotos';
-
   // ─── Captura desde Cámara ──────────────────────────────────────────
 
   /**
    * Captura una fotografía desde la cámara del dispositivo.
-   * Retorna el dataUrl de la imagen real para su uso directo en la vista y en el payload.
+   * Retorna un DataUrl temporal para la previsualización y la subida a Cloudinary.
    */
   async capturarFoto(): Promise<ResultadoFoto> {
     try {
@@ -36,14 +33,7 @@ export class CameraService {
       });
 
       if (foto?.dataUrl) {
-        let rutaPersistente: string | undefined;
-        if (Capacitor.isNativePlatform() && foto.base64String) {
-          rutaPersistente = await this.guardarFotoPersistente(foto);
-        }
-        return {
-          dataUrl: foto.dataUrl,
-          rutaPersistente,
-        };
+        return { dataUrl: foto.dataUrl };
       }
 
       return { dataUrl: '' };
@@ -70,14 +60,7 @@ export class CameraService {
       });
 
       if (foto?.dataUrl) {
-        let rutaPersistente: string | undefined;
-        if (Capacitor.isNativePlatform() && foto.base64String) {
-          rutaPersistente = await this.guardarFotoPersistente(foto);
-        }
-        return {
-          dataUrl: foto.dataUrl,
-          rutaPersistente,
-        };
+        return { dataUrl: foto.dataUrl };
       }
 
       return { dataUrl: '' };
@@ -102,25 +85,4 @@ export class CameraService {
     }
   }
 
-  // ─── Persistencia opcional nativa ──────────────────────────────────
-
-  private async guardarFotoPersistente(foto: Photo): Promise<string> {
-    const nombreArchivo = `${this.DIRECTORIO_FOTOS}/INC_${Date.now()}.${foto.format || 'jpeg'}`;
-    if (!Capacitor.isNativePlatform() || !foto.base64String) {
-      return nombreArchivo;
-    }
-
-    try {
-      await Filesystem.writeFile({
-        path: nombreArchivo,
-        data: foto.base64String,
-        directory: Directory.Data,
-        recursive: true,
-      });
-    } catch (fsErr) {
-      console.warn('Filesystem no pudo persistir el archivo nativamente:', fsErr);
-    }
-
-    return nombreArchivo;
-  }
 }

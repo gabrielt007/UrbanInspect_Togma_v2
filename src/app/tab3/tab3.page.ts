@@ -21,7 +21,7 @@ import {
 } from '@ionic/angular';
 import { addIcons } from 'ionicons';
 import { bookmarkOutline, trashOutline, alertCircleOutline, searchOutline } from 'ionicons/icons';
-import { firstValueFrom, forkJoin, merge } from 'rxjs';
+import { firstValueFrom, forkJoin } from 'rxjs';
 import type { Subscription } from 'rxjs';
 
 import type { Incidencia } from '../models/incidencia.model';
@@ -69,6 +69,7 @@ export class Tab3Page implements OnInit, OnDestroy {
   cargando = true;
 
   private suscripcionCambios?: Subscription;
+  private suscripcionCreacion?: Subscription;
   private secuenciaCarga = 0;
 
   constructor() {
@@ -76,14 +77,24 @@ export class Tab3Page implements OnInit, OnDestroy {
   }
 
   ngOnInit(): void {
-    this.suscripcionCambios = merge(
-      this.incidenciasService.incidenciaCreada$,
-      this.incidenciasService.incidenciaActualizada$,
-    ).subscribe(() => this.cargarIncidenciasSeguidas());
+    this.suscripcionCreacion = this.incidenciasService.incidenciaCreada$.subscribe((incidencia) => {
+      this.secuenciaCarga += 1;
+      this.incidenciasSeguidas = [
+        incidencia,
+        ...this.incidenciasSeguidas.filter(
+          (actual) => actual.codigo !== incidencia.codigo && actual.id !== incidencia.id,
+        ),
+      ];
+      this.cargando = false;
+    });
+    this.suscripcionCambios = this.incidenciasService.incidenciaActualizada$.subscribe(() =>
+      this.cargarIncidenciasSeguidas(),
+    );
   }
 
   ngOnDestroy(): void {
     this.suscripcionCambios?.unsubscribe();
+    this.suscripcionCreacion?.unsubscribe();
   }
 
   ionViewWillEnter(): void {
@@ -137,7 +148,10 @@ export class Tab3Page implements OnInit, OnDestroy {
   }
 
   verDetalle(incidencia: Incidencia): void {
-    this.router.navigate(['/tabs/tab2/detalle', incidencia.id]);
+    const identificador = incidencia.id || incidencia.codigo;
+    if (identificador) {
+      void this.router.navigate(['/tabs/tab2/detalle', identificador]);
+    }
   }
 
   async refrescar(event: CustomEvent): Promise<void> {

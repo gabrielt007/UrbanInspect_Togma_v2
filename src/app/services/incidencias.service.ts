@@ -1,14 +1,10 @@
-import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
-import { Observable, switchMap, map, tap, Subject, of, timeout, catchError } from 'rxjs';
+import { inject, Injectable } from '@angular/core';
+import { switchMap, map, tap, Subject, of, timeout, catchError, throwError } from 'rxjs';
+import type { Observable } from 'rxjs';
 
 import { environment } from '../../environments/environment';
-import {
-  Incidencia,
-  EstadoIncidencia,
-  CambioEstado,
-  CategoriaIncidencia,
-} from '../models/incidencia.model';
+import type { Incidencia, EstadoIncidencia, CambioEstado, CategoriaIncidencia } from '../models/incidencia.model';
 
 /**
  * Servicio de conexión HTTP con MockAPI para gestionar incidencias.
@@ -33,9 +29,7 @@ export class IncidenciasService {
   // ─── Obtención de Incidencias ────────────────────────────────────────
 
   obtenerIncidencias(page: number = 1, limit: number = 10): Observable<Incidencia[]> {
-    const params = new HttpParams()
-      .set('page', page.toString())
-      .set('limit', limit.toString());
+    const params = new HttpParams().set('page', page.toString()).set('limit', limit.toString());
 
     return this.http.get<Incidencia[]>(this.apiUrl, { params }).pipe(
       timeout(8_000),
@@ -53,7 +47,13 @@ export class IncidenciasService {
     );
   }
 
-  obtenerPorId(id: string): Observable<Incidencia> {
+  obtenerPorId(id: string): Observable<Incidencia | null> {
+    if (id.startsWith('INC-')) {
+      return this.buscarPorCodigo(id).pipe(
+        map((incidencias) => incidencias.find((incidencia) => incidencia.codigo === id) ?? null),
+      );
+    }
+
     return this.http.get<Incidencia>(`${this.apiUrl}/${id}`).pipe(
       timeout(8_000),
       map((i) =>
@@ -63,11 +63,11 @@ export class IncidenciasService {
               categoria: i.categoria || i.tipo,
               foto: i.foto || i.fotografia,
             }
-          : (null as unknown as Incidencia),
+          : null,
       ),
       catchError((error) => {
         console.warn(`Error al consultar incidencia ${id}:`, error);
-        return of(null as unknown as Incidencia);
+        return error.status === 404 ? of(null) : throwError(() => error);
       }),
     );
   }
@@ -148,11 +148,7 @@ export class IncidenciasService {
 
   // ─── Actualización de estados (R9) ───────────────────────────────────
 
-  actualizarEstado(
-    id: string,
-    nuevoEstado: EstadoIncidencia,
-    observacion: string,
-  ): Observable<Incidencia> {
+  actualizarEstado(id: string, nuevoEstado: EstadoIncidencia, observacion: string): Observable<Incidencia> {
     return this.obtenerPorId(id).pipe(
       switchMap((incidencia) => {
         if (!incidencia) {

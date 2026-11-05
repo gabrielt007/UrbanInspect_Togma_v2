@@ -95,6 +95,15 @@ describe('Tab3Page', () => {
     expect(component.incidenciasSeguidas[0].estado).toBe('resuelta');
   });
 
+  it('immediately adds a newly created incidence to tracking', () => {
+    const incidencia = crearIncidencia('INC-NUEVA');
+
+    incidenciaCreada.next(incidencia);
+
+    expect(component.incidenciasSeguidas).toEqual([incidencia]);
+    expect(component.cargando).toBe(false);
+  });
+
   it('removes a follow locally without deleting the remote incidence', async () => {
     const incidencia = crearIncidencia('INC-1');
     codigosSeguidos = [incidencia.codigo];
