@@ -173,7 +173,7 @@ android/              # Proyecto nativo Android de Capacitor
 
 ## Autor
 
-**Nombre:** `<NOMBRE DEL AUTOR>`  
+**Nombre:** Gabriel Toaquiza  
 **Proyecto:** UrbanInspect — proyecto académico
 
 ## Observaciones
