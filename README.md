@@ -112,6 +112,10 @@ No agregues claves, credenciales ni URLs privadas a los archivos versionados. Lo
 
 ## Ejecución del proyecto
 
+### Aplicación publicada
+
+Accede a UrbanInspect en [https://uio-togma-dam.web.app/login](https://uio-togma-dam.web.app/login).
+
 ### Aplicación web en desarrollo
 
 ```bash
