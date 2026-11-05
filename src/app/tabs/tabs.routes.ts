@@ -1,6 +1,21 @@
-import type { Routes } from '@angular/router';
+import { inject } from '@angular/core';
+import { Router, type CanActivateFn, type Routes } from '@angular/router';
+import { firstValueFrom, take } from 'rxjs';
 
+import { AuthService } from '../services/auth';
 import { TabsPage } from './tabs.page';
+
+const requireAuthentication: CanActivateFn = async (_route, state) => {
+  const auth = inject(AuthService);
+  const router = inject(Router);
+  const user = await firstValueFrom(auth.user$.pipe(take(1)));
+
+  return user
+    ? true
+    : router.createUrlTree(['/login'], {
+        queryParams: { returnUrl: state.url },
+      });
+};
 
 /**
  * Rutas de la estructura de tabs.
@@ -14,6 +29,8 @@ export const routes: Routes = [
   {
     path: 'tabs',
     component: TabsPage,
+    canActivate: [requireAuthentication],
+    canActivateChild: [requireAuthentication],
     children: [
       {
         path: 'tab1',
@@ -25,8 +42,7 @@ export const routes: Routes = [
       },
       {
         path: 'tab2/detalle/:id',
-        loadComponent: () =>
-          import('../pages/detalle/detalle.page').then((m) => m.DetallePage),
+        loadComponent: () => import('../pages/detalle/detalle.page').then((m) => m.DetallePage),
       },
       {
         path: 'tab3',
@@ -41,7 +57,7 @@ export const routes: Routes = [
   },
   {
     path: '',
-    redirectTo: '/tabs/tab1',
+    redirectTo: '/login',
     pathMatch: 'full',
   },
 ];

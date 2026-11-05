@@ -1,0 +1,59 @@
+<ion-content class="login-content">
+  <main class="login-layout">
+    <section class="login-card" aria-labelledby="login-title">
+      <div class="brand-mark" aria-hidden="true">
+        <ion-icon name="stats-chart-outline"></ion-icon>
+      </div>
+
+      <p class="brand-name">UrbanInspect</p>
+      <h1 id="login-title">Bienvenido</h1>
+      <p class="login-intro">Inicia sesión o crea una cuenta para continuar.</p>
+
+      <div class="login-fields">
+        <ion-item class="login-field" lines="none">
+          <ion-icon slot="start" name="mail-outline" aria-hidden="true"></ion-icon>
+          <ion-input
+            label="Correo electrónico"
+            labelPlacement="stacked"
+            type="email"
+            autocomplete="email"
+            [(ngModel)]="email"
+          >
+          </ion-input>
+        </ion-item>
+
+        <ion-item class="login-field" lines="none">
+          <ion-icon slot="start" name="lock-closed-outline" aria-hidden="true"></ion-icon>
+          <ion-input
+            label="Contraseña"
+            labelPlacement="stacked"
+            type="password"
+            autocomplete="current-password"
+            [(ngModel)]="password"
+          >
+          </ion-input>
+        </ion-item>
+      </div>
+
+      @if (error) {
+      <ion-text color="danger">
+        <p class="login-error" role="alert">{{ error }}</p>
+      </ion-text>
+      }
+
+      <ion-button class="login-action" expand="block" [disabled]="loading || !email || !password" (click)="login()">
+        {{ loading ? 'Iniciando sesión...' : 'Iniciar sesión' }}
+      </ion-button>
+
+      <ion-button
+        class="register-action"
+        expand="block"
+        fill="clear"
+        [disabled]="loading || !email || !password"
+        (click)="register()"
+      >
+        Crear una cuenta
+      </ion-button>
+    </section>
+  </main>
+</ion-content>
